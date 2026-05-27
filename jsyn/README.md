@@ -226,7 +226,7 @@ Each subscription returns a `Subscription` handle — call `cancel()` to stop.
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| `UnsatisfiedLinkError: missing native: com/benashby/jsyn/natives/...` | `jsyn-natives-<platform>` not on classpath | Add the runtime-only dependency for your OS |
+| `UnsatisfiedLinkError: missing native: com/synauson/jsyn/natives/...` | `jsyn-natives-<platform>` not on classpath | Add the runtime-only dependency for your OS |
 | `Can't find gstreamer-1.0-0.dll` (Windows) | GStreamer not installed, or installed without PATH update | Install per the Windows section above; reboot to refresh PATH |
 | Process exits silently on first `JSyn` construction | ORT model file missing or wrong filename | Verify `silero_vad.onnx` and `smart_turn.onnx` live directly under `modelsDir` |
 | `UnsatisfiedLinkError: ... msvcr100.dll missing` | Old MSVC runtime missing | Install Visual C++ Redistributable for VS 2015–2022 |

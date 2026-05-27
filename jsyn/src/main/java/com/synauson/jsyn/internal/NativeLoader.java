@@ -19,7 +19,7 @@ import java.nio.file.StandardCopyOption;
  * @since 0.1.0
  */
 public final class NativeLoader {
-    private static final String RESOURCE_PREFIX = "com/benashby/jsyn/natives/";
+    private static final String RESOURCE_PREFIX = "com/synauson/jsyn/natives/";
     private static volatile String ortDylibAbsolutePath;
     private static volatile boolean loaded;
 

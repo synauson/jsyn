@@ -222,7 +222,7 @@ the system install.
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| `UnsatisfiedLinkError: missing native: com/benashby/jsyn/natives/...` | `jsyn-natives-<platform>` not on classpath | Add the `runtimeOnly` dependency for your OS |
+| `UnsatisfiedLinkError: missing native: com/synauson/jsyn/natives/...` | `jsyn-natives-<platform>` not on classpath | Add the `runtimeOnly` dependency for your OS |
 | `Can't find gstreamer-1.0-0.dll` (Windows) | GStreamer not installed or PATH not refreshed | Install per the Windows section above; reboot |
 | Process exits silently on first `JSyn` construction | ORT model file missing or wrong filename | Verify `silero_vad.onnx` and `smart_turn.onnx` are directly under `modelsDir` |
 | `UnsatisfiedLinkError: msvcr100.dll missing` | Old MSVC runtime missing | Install Visual C++ Redistributable for VS 2015–2022 |
