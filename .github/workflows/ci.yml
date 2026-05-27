@@ -37,3 +37,40 @@ jobs:
           NEXUS_USER: ${{ secrets.NEXUS_USER }}
           NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
         run: ./gradlew :jsyn:compileJava :jsyn:compileTestJava --no-daemon --console=plain
+
+  # -------------------------------------------------------------------------
+  # Publish com.synauson:jsyn:0.1.0-SNAPSHOT to Nexus on every push to main.
+  # This gives the examples testbed a stable, always-current snapshot to pull
+  # without coordinating timestamp-based version strings across repos.
+  # PRs do not publish.
+  # -------------------------------------------------------------------------
+  publish-snapshot:
+    runs-on: ubuntu-latest
+    needs: java-compile
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Temurin 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
+
+      - name: Cache Gradle wrapper + caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-snapshot-${{ hashFiles('**/*.gradle*', 'gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-snapshot-
+
+      - name: publish jsyn snapshot to Nexus
+        env:
+          JSYN_VERSION: 0.1.0-SNAPSHOT
+          NEXUS_URL: ${{ secrets.NEXUS_URL }}
+          NEXUS_USER: ${{ secrets.NEXUS_USER }}
+          NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
+        run: ./gradlew :jsyn:publish --no-daemon --console=plain
