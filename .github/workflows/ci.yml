@@ -39,7 +39,7 @@ jobs:
         run: ./gradlew :jsyn:compileJava :jsyn:compileTestJava --no-daemon --console=plain
 
   # -------------------------------------------------------------------------
-  # Publish com.synauson:jsyn:0.1.0-SNAPSHOT to Nexus on every push to main.
+  # Publish com.synauson:jsyn:1.0.0-SNAPSHOT to Nexus on every push to main.
   # This gives the examples testbed a stable, always-current snapshot to pull
   # without coordinating timestamp-based version strings across repos.
   # PRs do not publish.
@@ -69,7 +69,7 @@ jobs:
 
       - name: publish jsyn snapshot to Nexus
         env:
-          JSYN_VERSION: 0.1.0-SNAPSHOT
+          JSYN_VERSION: 1.0.0-SNAPSHOT
           NEXUS_URL: ${{ secrets.NEXUS_URL }}
           NEXUS_USER: ${{ secrets.NEXUS_USER }}
           NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
