@@ -5,11 +5,16 @@ dependencies {
     // Native artifacts are pre-built platform JARs published separately by the
     // synauson build system. NativeLoader picks the right .so/.dll at JVM startup
     // from os.name / os.arch, so both can be on the classpath simultaneously.
+    //
+    // nativesVersion is pinned independently of jsyn's own version so jsyn can
+    // advance without requiring a new synauson/natives release. Only bump this
+    // when jsyn adds JNI calls that require a newer compiled native.
+    val nativesVersion = findProperty("jsynNativesVersion") as String? ?: "1.0.0-SNAPSHOT"
     val osName = System.getProperty("os.name").lowercase()
     if (osName.contains("windows")) {
-        testRuntimeOnly("com.synauson:jsyn-natives-windows:${version}")
+        testRuntimeOnly("com.synauson:jsyn-natives-windows:${nativesVersion}")
     } else {
-        testRuntimeOnly("com.synauson:jsyn-natives-linux:${version}")
+        testRuntimeOnly("com.synauson:jsyn-natives-linux:${nativesVersion}")
     }
 }
 
