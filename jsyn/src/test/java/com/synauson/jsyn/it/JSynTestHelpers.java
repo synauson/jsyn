@@ -143,6 +143,28 @@ final class JSynTestHelpers {
         return buf;
     }
 
+    /**
+     * Generate a synthetic PCM buffer of a sine wave at the given frequency
+     * for the specified duration in seconds, in 16-bit signed little-endian
+     * format, at 8 kHz mono — the SIP/PCMU clock rate.
+     *
+     * <p>Amplitude is halved relative to {@link #generateSinePcm16k} (16000
+     * vs 32000) as headroom before mu-law encoding, which compands more
+     * aggressively near full scale.
+     */
+    static byte[] generateSinePcm8k(double freqHz, double durationSeconds) {
+        int sampleRate = 8_000;
+        int totalSamples = (int) (sampleRate * durationSeconds);
+        byte[] buf = new byte[totalSamples * 2];
+        for (int n = 0; n < totalSamples; n++) {
+            double t = n / (double) sampleRate;
+            short s = (short) (16_000.0 * Math.sin(2.0 * Math.PI * freqHz * t));
+            buf[n * 2]     = (byte) (s & 0xff);
+            buf[n * 2 + 1] = (byte) ((s >> 8) & 0xff);
+        }
+        return buf;
+    }
+
     /** Compute RMS energy of a signed-16-bit little-endian PCM buffer. */
     static double computeRmsS16LE(byte[] buf, int len) {
         long sum = 0;

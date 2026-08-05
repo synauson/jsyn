@@ -3,7 +3,6 @@ package com.synauson.jsyn.it;
 import com.synauson.jsyn.JSyn;
 import com.synauson.jsyn.Subscription;
 import com.synauson.jsyn.event.VadEvent;
-import com.synauson.jsyn.it.support.RtpPacket;
 import com.synauson.jsyn.it.support.SipRtpPeer;
 import com.synauson.jsyn.participant.Conference;
 import com.synauson.jsyn.participant.SipParticipantHandle;
@@ -16,13 +15,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 import java.nio.file.Path;
-import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Deep SIP media test using {@link com.synauson.jsyn.it.support.SipRtpPeer}: real inbound RTP/PCMU audio
@@ -42,6 +38,9 @@ class SipMediaE2eIT {
                 .resolve("synauson-server/tests/fixtures/short_speech.wav");
         Assumptions.assumeTrue(speechWav.toFile().exists(),
                 "short_speech.wav not found — skipping SIP media IT");
+        Path modelsDir = JSynTestHelpers.resolveSynausonRepo().resolve("models");
+        Assumptions.assumeTrue(modelsDir.resolve("silero_vad.onnx").toFile().exists(),
+                "silero_vad.onnx not found — skipping SIP media IT");
 
         byte[] pcm16k = JSynTestHelpers.readPcmFromWav(speechWav);
         byte[] pcm8k = downsampleS16LE16kTo8k(pcm16k);
@@ -116,7 +115,7 @@ class SipMediaE2eIT {
             conf.updatePartyAudioConnections(
                     new ConnectionMatrix(ConnectionEntry.connect(sipPid, sipPid)));
 
-            byte[] tone = generateSinePcm8k(440.0, 2.0);
+            byte[] tone = JSynTestHelpers.generateSinePcm8k(440.0, 2.0);
             int frameBytes = 320;
             long deadline = System.currentTimeMillis() + 2000;
             int offset = 0;
@@ -130,11 +129,20 @@ class SipMediaE2eIT {
                 Thread.sleep(18);
             }
 
-            List<RtpPacket> captured = peer.capturedPackets();
-            assertFalse(captured.isEmpty(),
-                    "expected synauson to send real RTP audio back to the peer's socket");
-            assertTrue(captured.stream().anyMatch(p -> p.payloadType == 0),
-                    "expected at least one captured packet with PCMU payload type 0");
+            // Poll for a short grace period after the send loop ends rather than
+            // asserting synchronously — pipeline warm-up / first-buffer latency
+            // may not complete within the send window alone. Same deadline-poll
+            // idiom as SipRtpPeerTest in this package.
+            long checkDeadline = System.currentTimeMillis() + 3000;
+            boolean foundPcmu = false;
+            while (System.currentTimeMillis() < checkDeadline && !foundPcmu) {
+                foundPcmu = peer.capturedPackets().stream().anyMatch(p -> p.payloadType == 0);
+                if (!foundPcmu) {
+                    Thread.sleep(50);
+                }
+            }
+            assertTrue(foundPcmu,
+                    "expected at least one captured packet with PCMU payload type 0 within the grace period");
 
             conf.removeParticipant(sipPid);
         }
@@ -149,18 +157,5 @@ class SipMediaE2eIT {
             out[i * 2 + 1] = pcm16k[i * 4 + 1];
         }
         return out;
-    }
-
-    private static byte[] generateSinePcm8k(double freqHz, double durationSeconds) {
-        int sampleRate = 8_000;
-        int totalSamples = (int) (sampleRate * durationSeconds);
-        byte[] buf = new byte[totalSamples * 2];
-        for (int n = 0; n < totalSamples; n++) {
-            double t = n / (double) sampleRate;
-            short s = (short) (16_000.0 * Math.sin(2.0 * Math.PI * freqHz * t));
-            buf[n * 2] = (byte) (s & 0xff);
-            buf[n * 2 + 1] = (byte) ((s >> 8) & 0xff);
-        }
-        return buf;
     }
 }
