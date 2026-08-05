@@ -21,11 +21,32 @@ final class JSynTestHelpers {
 
     private JSynTestHelpers() {}
 
+    /**
+     * Resolve the sibling {@code synauson} repo checkout used for model and
+     * fixture files ({@code models/*.onnx},
+     * {@code synauson-server/tests/fixtures/short_speech.wav}).
+     *
+     * <p>CI passes {@code -DsynausonRepoDir=<checkout path>} explicitly,
+     * since the two repos are checked out independently there. Local runs
+     * fall back to the standard sibling-repo layout
+     * ({@code ~/projects/synauson/{jsyn,synauson}}) documented in both
+     * repos' CLAUDE.md — two levels up from this Gradle project directory
+     * ({@code jsyn/jsyn/}) reaches the shared parent, then back down into
+     * the sibling checkout.
+     */
+    static Path resolveSynausonRepo() {
+        String override = System.getProperty("synausonRepoDir");
+        if (override != null) {
+            return Path.of(override).toAbsolutePath();
+        }
+        return Path.of("../../synauson").toAbsolutePath();
+    }
+
     /** Create a new JSyn instance with a unique RTP port range. */
     static JSyn newJSyn() {
         int rtpMin = PORT_BASE.getAndAdd(200);
         return new JSyn(JSynConfig.builder()
-                .modelsDir(Path.of("../../../models").toAbsolutePath().toString())
+                .modelsDir(resolveSynausonRepo().resolve("models").toString())
                 .rtpPortMin(rtpMin)
                 .rtpPortMax(rtpMin + 199)
                 .build());
@@ -42,12 +63,13 @@ final class JSynTestHelpers {
      * </ol>
      */
     static Path sineWav16k() throws Exception {
-        Path speech = Path.of("../../../synauson-server/tests/fixtures/short_speech.wav")
-                .toAbsolutePath();
+        Path speech = resolveSynausonRepo()
+                .resolve("synauson-server/tests/fixtures/short_speech.wav");
         if (speech.toFile().exists()) {
             return speech;
         }
-        Path fixturesDir = Path.of("../../../synauson-server/tests/fixtures").toAbsolutePath();
+        Path fixturesDir = resolveSynausonRepo()
+                .resolve("synauson-server/tests/fixtures");
         if (fixturesDir.toFile().exists()) {
             java.io.File[] wavs = fixturesDir.toFile().listFiles(f -> f.getName().endsWith(".wav"));
             if (wavs != null && wavs.length > 0) {
