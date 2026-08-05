@@ -25,6 +25,15 @@ public final class RtpPacket {
         if (len < 12) {
             throw new IllegalArgumentException("packet too short to be RTP: " + len + " bytes");
         }
+        if ((buf[0] & 0x20) != 0) {
+            throw new IllegalArgumentException("padding bit set: unsupported");
+        }
+        if ((buf[0] & 0x10) != 0) {
+            throw new IllegalArgumentException("extension bit set: unsupported");
+        }
+        if ((buf[0] & 0x0F) != 0) {
+            throw new IllegalArgumentException("CSRC count nonzero: unsupported");
+        }
         int payloadType = buf[1] & 0x7F;
         int sequenceNumber = ((buf[2] & 0xFF) << 8) | (buf[3] & 0xFF);
         long timestamp = ((long) (buf[4] & 0xFF) << 24) | ((long) (buf[5] & 0xFF) << 16)

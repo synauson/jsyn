@@ -1,10 +1,7 @@
 package com.synauson.jsyn.it.support;
 
 import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 
 class RtpPacketTest {
 
@@ -37,5 +34,30 @@ class RtpPacketTest {
     @Test
     void parseRejectsPacketShorterThanRtpHeader() {
         assertThrows(IllegalArgumentException.class, () -> RtpPacket.parse(new byte[]{1, 2, 3}, 3));
+    }
+
+    @Test
+    void multiByteFieldsAreEncodedInNetworkByteOrder() {
+        byte[] wire = RtpPacket.build(0, false, 0x0102, 0x03040506L, 0x0708090AL, new byte[0]);
+        // bytes 2-3: sequence number, big-endian
+        assertEquals((byte) 0x01, wire[2]);
+        assertEquals((byte) 0x02, wire[3]);
+        // bytes 4-7: timestamp, big-endian
+        assertEquals((byte) 0x03, wire[4]);
+        assertEquals((byte) 0x04, wire[5]);
+        assertEquals((byte) 0x05, wire[6]);
+        assertEquals((byte) 0x06, wire[7]);
+        // bytes 8-11: ssrc, big-endian
+        assertEquals((byte) 0x07, wire[8]);
+        assertEquals((byte) 0x08, wire[9]);
+        assertEquals((byte) 0x09, wire[10]);
+        assertEquals((byte) 0x0A, wire[11]);
+    }
+
+    @Test
+    void parseRejectsExtensionBit() {
+        byte[] wire = RtpPacket.build(0, false, 1, 0L, 1L, new byte[]{9});
+        wire[0] |= 0x10; // set extension bit
+        assertThrows(IllegalArgumentException.class, () -> RtpPacket.parse(wire, wire.length));
     }
 }
