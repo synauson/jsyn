@@ -24,8 +24,13 @@ class RtpPacketTest {
         byte[] noMarker = RtpPacket.build(101, false, 1, 0L, 1L, new byte[]{9});
         byte[] withMarker = RtpPacket.build(101, true, 1, 0L, 1L, new byte[]{9});
 
-        assertEquals(101, RtpPacket.parse(noMarker, noMarker.length).payloadType);
-        assertEquals(101, RtpPacket.parse(withMarker, withMarker.length).payloadType);
+        RtpPacket parsedNoMarker = RtpPacket.parse(noMarker, noMarker.length);
+        RtpPacket parsedWithMarker = RtpPacket.parse(withMarker, withMarker.length);
+
+        assertEquals(101, parsedNoMarker.payloadType);
+        assertEquals(101, parsedWithMarker.payloadType);
+        assertFalse(parsedNoMarker.marker, "marker bit must round-trip as false");
+        assertTrue(parsedWithMarker.marker, "marker bit must round-trip as true");
         // Marker bit lives in byte[1] bit 7; payload type must not be corrupted by it.
         assertEquals((byte) 0x65, noMarker[1]);       // 0110 0101 = marker 0, PT 101
         assertEquals((byte) 0xE5, withMarker[1]);     // 1110 0101 = marker 1, PT 101

@@ -71,6 +71,10 @@ class SipRtpPeerTest {
                 assertEquals(101, p.payloadType);
                 assertEquals(5, p.payload[0] & 0xFF, "event number must be 5");
             }
+            assertTrue(captured.get(0).marker, "first packet of a new event must carry the marker bit");
+            for (int i = 1; i < captured.size(); i++) {
+                assertFalse(captured.get(i).marker, "only the first packet of an event should carry the marker bit");
+            }
             // Last packet must have the end-of-event bit (0x80) set in payload byte 1.
             RtpPacket last = captured.get(captured.size() - 1);
             assertTrue((last.payload[1] & 0x80) != 0, "final packet must set the end-of-event bit");

@@ -7,13 +7,16 @@ package com.synauson.jsyn.it.support;
  */
 public final class RtpPacket {
     public final int payloadType;
+    public final boolean marker;
     public final int sequenceNumber;
     public final long timestamp;
     public final long ssrc;
     public final byte[] payload;
 
-    public RtpPacket(int payloadType, int sequenceNumber, long timestamp, long ssrc, byte[] payload) {
+    public RtpPacket(int payloadType, boolean marker, int sequenceNumber, long timestamp, long ssrc,
+                      byte[] payload) {
         this.payloadType = payloadType;
+        this.marker = marker;
         this.sequenceNumber = sequenceNumber;
         this.timestamp = timestamp;
         this.ssrc = ssrc;
@@ -35,6 +38,7 @@ public final class RtpPacket {
             throw new IllegalArgumentException("CSRC count nonzero: unsupported");
         }
         int payloadType = buf[1] & 0x7F;
+        boolean marker = (buf[1] & 0x80) != 0;
         int sequenceNumber = ((buf[2] & 0xFF) << 8) | (buf[3] & 0xFF);
         long timestamp = ((long) (buf[4] & 0xFF) << 24) | ((long) (buf[5] & 0xFF) << 16)
                 | ((long) (buf[6] & 0xFF) << 8) | (buf[7] & 0xFF);
@@ -42,7 +46,7 @@ public final class RtpPacket {
                 | ((long) (buf[10] & 0xFF) << 8) | (buf[11] & 0xFF);
         byte[] payload = new byte[len - 12];
         System.arraycopy(buf, 12, payload, 0, payload.length);
-        return new RtpPacket(payloadType, sequenceNumber, timestamp, ssrc, payload);
+        return new RtpPacket(payloadType, marker, sequenceNumber, timestamp, ssrc, payload);
     }
 
     /** Serialize an RTP header + payload ready to send over a socket. */
