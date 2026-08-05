@@ -15,7 +15,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -41,11 +40,11 @@ class RealVadE2eLatencyIT {
         String pid = "lat-p-" + ts;
 
         // VAD requires actual speech — a pure sine will not trigger Silero VAD.
-        Path speechWav = Paths.get("../../../synauson-server/tests/fixtures/short_speech.wav")
-                .toAbsolutePath();
+        Path speechWav = JSynTestHelpers.resolveSynausonRepo()
+                .resolve("synauson-server/tests/fixtures/short_speech.wav");
         Assumptions.assumeTrue(speechWav.toFile().exists(),
                 "short_speech.wav not found — skipping latency IT");
-        Path modelsDir = Paths.get("../../../models").toAbsolutePath();
+        Path modelsDir = JSynTestHelpers.resolveSynausonRepo().resolve("models");
         Assumptions.assumeTrue(modelsDir.resolve("silero_vad.onnx").toFile().exists(),
                 "silero_vad.onnx not found — skipping latency IT");
 

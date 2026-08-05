@@ -15,7 +15,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -42,11 +41,11 @@ class VadDetectorIT {
 
         // VAD requires actual speech audio — a pure sine wave won't trigger Silero VAD.
         // Use the short_speech.wav fixture. Skip if neither fixture nor models are present.
-        Path speechWav = Paths.get("../../../synauson-server/tests/fixtures/short_speech.wav")
-                .toAbsolutePath();
+        Path speechWav = JSynTestHelpers.resolveSynausonRepo()
+                .resolve("synauson-server/tests/fixtures/short_speech.wav");
         Assumptions.assumeTrue(speechWav.toFile().exists(),
                 "short_speech.wav fixture not found at " + speechWav + " — skipping VAD IT");
-        Path modelsDir = Paths.get("../../../models").toAbsolutePath();
+        Path modelsDir = JSynTestHelpers.resolveSynausonRepo().resolve("models");
         Assumptions.assumeTrue(modelsDir.resolve("silero_vad.onnx").toFile().exists(),
                 "silero_vad.onnx not found in " + modelsDir + " — skipping VAD IT");
 

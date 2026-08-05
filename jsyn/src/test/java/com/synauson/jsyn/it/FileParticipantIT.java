@@ -19,9 +19,10 @@ class FileParticipantIT {
     void filePlaysAndEmitsEvents() throws Exception {
         // Prefer the short_speech.wav shipped with the server test suite.
         // Fall back to generating a synthetic WAV so the test always runs.
-        Path speechWav = Path.of("../../../synauson-server/tests/fixtures/short_speech.wav")
-                .toAbsolutePath();
-        Path fixturesDir = Path.of("../../../synauson-server/tests/fixtures").toAbsolutePath();
+        Path speechWav = JSynTestHelpers.resolveSynausonRepo()
+                .resolve("synauson-server/tests/fixtures/short_speech.wav");
+        Path fixturesDir = JSynTestHelpers.resolveSynausonRepo()
+                .resolve("synauson-server/tests/fixtures");
         File[] wavs = speechWav.toFile().exists()
                 ? new File[]{speechWav.toFile()}
                 : new File(fixturesDir.toString()).listFiles(f -> f.getName().endsWith(".wav"));

@@ -10,7 +10,7 @@ class JSynLifecycleIT {
 
     static JSynConfig cfg() {
         return JSynConfig.builder()
-            .modelsDir(java.nio.file.Path.of("../../../models").toAbsolutePath().toString())
+            .modelsDir(JSynTestHelpers.resolveSynausonRepo().resolve("models").toString())
             .build();
     }
 

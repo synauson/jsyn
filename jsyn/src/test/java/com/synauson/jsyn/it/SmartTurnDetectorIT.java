@@ -15,7 +15,6 @@ import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
-import java.nio.file.Paths;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -38,9 +37,9 @@ class SmartTurnDetectorIT {
     @Test
     void turnResultEventArrivesAfterEnoughAudio() throws Exception {
         // SmartTurn requires real speech (VAD fires first), and both model files.
-        java.nio.file.Path speechWav = Paths.get(
-                "../../../synauson-server/tests/fixtures/short_speech.wav").toAbsolutePath();
-        java.nio.file.Path modelsDir = Paths.get("../../../models").toAbsolutePath();
+        java.nio.file.Path speechWav = JSynTestHelpers.resolveSynausonRepo()
+                .resolve("synauson-server/tests/fixtures/short_speech.wav");
+        java.nio.file.Path modelsDir = JSynTestHelpers.resolveSynausonRepo().resolve("models");
         Assumptions.assumeTrue(speechWav.toFile().exists(),
                 "short_speech.wav not found — skipping SmartTurn IT");
         Assumptions.assumeTrue(modelsDir.resolve("silero_vad.onnx").toFile().exists(),
