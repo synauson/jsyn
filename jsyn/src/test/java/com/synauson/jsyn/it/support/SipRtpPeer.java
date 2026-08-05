@@ -11,6 +11,7 @@ import java.util.Random;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * A minimal real SIP/RTP remote peer for integration tests.
@@ -29,12 +30,19 @@ import java.util.concurrent.atomic.AtomicInteger;
  * sending anything.
  */
 public final class SipRtpPeer implements AutoCloseable {
+    /** RFC 3550/4733 packetization interval used for both audio frames and DTMF pacing. */
+    private static final int PACKETIZATION_INTERVAL_MS = 20;
+    /** Samples per packetization interval at the 8kHz RTP clock shared by PCMU audio and telephone-event. */
+    private static final int SAMPLES_PER_PACKET_8KHZ = 160;
+
     private final DatagramSocket socket;
     private final long ssrc;
-    private final AtomicInteger audioSequenceNumber = new AtomicInteger(1000);
-    private final AtomicInteger dtmfSequenceNumber = new AtomicInteger(5000);
+    // RFC 3550: one SSRC (one sender) uses a single monotonically-incrementing sequence-number
+    // space across every packet it emits, audio and DTMF alike — not two independent counters.
+    private final AtomicInteger sequenceNumber = new AtomicInteger(1000);
     private final List<RtpPacket> captured = new CopyOnWriteArrayList<>();
     private final AtomicBoolean running = new AtomicBoolean(true);
+    private final AtomicReference<Throwable> receiveLoopFailure = new AtomicReference<>();
     private final Thread receiveThread;
 
     private volatile InetAddress targetAddress;
@@ -69,12 +77,22 @@ public final class SipRtpPeer implements AutoCloseable {
                 captured.add(RtpPacket.parse(packet.getData(), packet.getLength()));
             } catch (SocketTimeoutException expected) {
                 // normal: re-check the running flag and loop again
+            } catch (RuntimeException malformedPacket) {
+                // A real peer can legitimately send something RtpPacket.parse doesn't
+                // handle (RTCP, header extensions) — record it but keep the loop alive
+                // rather than silently dying and leaving captured() frozen forever.
+                receiveLoopFailure.set(malformedPacket);
             } catch (IOException e) {
                 if (running.get()) {
-                    throw new RuntimeException("SipRtpPeer receive loop failed", e);
+                    receiveLoopFailure.set(e);
                 }
             }
         }
+    }
+
+    /** Non-null if the background receive loop hit an error processing a packet. */
+    public Throwable receiveLoopFailure() {
+        return receiveLoopFailure.get();
     }
 
     /**
@@ -90,8 +108,8 @@ public final class SipRtpPeer implements AutoCloseable {
         }
         requireTarget();
         byte[] ulaw = MuLawCodec.encodeBuffer(pcmS16LE160Samples, 0, pcmS16LE160Samples.length);
-        int seq = audioSequenceNumber.getAndIncrement();
-        long timestamp = seq * 160L; // 160 samples/frame at an 8kHz RTP clock
+        int seq = sequenceNumber.getAndIncrement();
+        long timestamp = seq * (long) SAMPLES_PER_PACKET_8KHZ;
         send(RtpPacket.build(0 /* PCMU */, false, seq, timestamp, ssrc, ulaw));
     }
 
@@ -117,16 +135,19 @@ public final class SipRtpPeer implements AutoCloseable {
         requireTarget();
         int volume = 10; // -10 dBm0, matches synauson-core's own send-side default (participants/sip/dtmf.rs)
         int totalDurationSamples = durationMs * 8; // 8kHz clock
-        int step = 160; // one 20ms packetization interval at 8kHz
 
-        int seq = dtmfSequenceNumber.getAndIncrement();
-        long eventTimestamp = seq * 160L; // shared across the whole event per RFC 4733 section 2.5.1.3
+        // RFC 3550: this event's packets share the same monotonic sequence-number space as
+        // this peer's audio packets (one SSRC, one sequence-number space), and per RFC 4733
+        // section 2.5.1.3 the RTP timestamp is fixed for every packet of the same event —
+        // both derived from the shared 8kHz sample clock, not a DTMF-only counter.
+        int seq = sequenceNumber.getAndIncrement();
+        long eventTimestamp = seq * (long) SAMPLES_PER_PACKET_8KHZ;
         boolean first = true;
-        for (int elapsed = step; elapsed < totalDurationSamples; elapsed += step) {
+        for (int elapsed = SAMPLES_PER_PACKET_8KHZ; elapsed < totalDurationSamples; elapsed += SAMPLES_PER_PACKET_8KHZ) {
             byte[] payload = buildDtmfPayload(eventNumber, false, volume, elapsed);
             send(RtpPacket.build(dtmfPayloadType, first, seq, eventTimestamp, ssrc, payload));
             first = false;
-            seq = dtmfSequenceNumber.getAndIncrement();
+            seq = sequenceNumber.getAndIncrement();
             sleepPacketizationInterval();
         }
         byte[] endPayload = buildDtmfPayload(eventNumber, true, volume, totalDurationSamples);
@@ -136,7 +157,7 @@ public final class SipRtpPeer implements AutoCloseable {
 
     private static void sleepPacketizationInterval() throws IOException {
         try {
-            Thread.sleep(20); // matches the 20ms RTP clock step used above
+            Thread.sleep(PACKETIZATION_INTERVAL_MS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IOException("interrupted while pacing DTMF packet send", e);

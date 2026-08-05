@@ -3,11 +3,16 @@ package com.synauson.jsyn.it.support;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -78,6 +83,43 @@ class SipRtpPeerTest {
             // Last packet must have the end-of-event bit (0x80) set in payload byte 1.
             RtpPacket last = captured.get(captured.size() - 1);
             assertTrue((last.payload[1] & 0x80) != 0, "final packet must set the end-of-event bit");
+        }
+    }
+
+    @Test
+    void receiveLoopSurvivesMalformedPacketAndKeepsCapturing() throws Exception {
+        try (SipRtpPeer a = new SipRtpPeer();
+             SipRtpPeer b = new SipRtpPeer();
+             DatagramSocket rawSender = new DatagramSocket()) {
+            a.setTarget("127.0.0.1", b.localPort());
+            assertNull(b.receiveLoopFailure(), "no failure should be recorded before anything is sent");
+
+            // Too short to be RTP (RtpPacket.parse requires at least 12 bytes) — a real peer
+            // could legitimately send something this small (e.g. a keepalive), and it must not
+            // silently kill the receive loop.
+            byte[] garbage = {1, 2, 3};
+            rawSender.send(new DatagramPacket(garbage, garbage.length, InetAddress.getByName("127.0.0.1"),
+                    b.localPort()));
+
+            long failureDeadline = System.currentTimeMillis() + 5000;
+            while (System.currentTimeMillis() < failureDeadline && b.receiveLoopFailure() == null) {
+                Thread.sleep(50);
+            }
+            assertNotNull(b.receiveLoopFailure(), "malformed packet should be recorded, not silently dropped");
+
+            byte[] frame = new byte[320];
+            for (int i = 0; i < 320; i++) frame[i] = (byte) i;
+            a.sendAudioFrame(frame);
+
+            long captureDeadline = System.currentTimeMillis() + 5000;
+            List<RtpPacket> captured = List.of();
+            while (System.currentTimeMillis() < captureDeadline && captured.isEmpty()) {
+                captured = b.capturedPackets();
+                if (captured.isEmpty()) Thread.sleep(50);
+            }
+
+            assertFalse(captured.isEmpty(), "receive loop must keep capturing valid packets after a malformed one");
+            assertEquals(0, captured.get(0).payloadType, "PCMU payload type is 0");
         }
     }
 }
