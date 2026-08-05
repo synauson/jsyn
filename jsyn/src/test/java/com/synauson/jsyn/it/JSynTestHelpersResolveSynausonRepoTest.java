@@ -2,6 +2,7 @@ package com.synauson.jsyn.it;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
@@ -11,9 +12,29 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 
 class JSynTestHelpersResolveSynausonRepoTest {
 
+    // Save/restore rather than unconditionally clear: on Linux, tasks.test
+    // does not fork a fresh JVM per class (forkEvery is Windows-only — see
+    // build.gradle.kts), so every test class in this suite shares one JVM
+    // and therefore one System properties table. An earlier version of
+    // this test unconditionally cleared "synausonRepoDir" in @AfterEach,
+    // which wiped out the value CI forwards via -DsynausonRepoDir for every
+    // test class that happened to run afterward in the same JVM — causing
+    // VadDetectorIT/SmartTurnDetectorIT/RealVadE2eLatencyIT to silently
+    // fall back to the (CI-incompatible) local relative path and skip.
+    private String originalSynausonRepoDir;
+
+    @BeforeEach
+    void saveSystemProperty() {
+        originalSynausonRepoDir = System.getProperty("synausonRepoDir");
+    }
+
     @AfterEach
-    void clearSystemProperty() {
-        System.clearProperty("synausonRepoDir");
+    void restoreSystemProperty() {
+        if (originalSynausonRepoDir == null) {
+            System.clearProperty("synausonRepoDir");
+        } else {
+            System.setProperty("synausonRepoDir", originalSynausonRepoDir);
+        }
     }
 
     @Test
