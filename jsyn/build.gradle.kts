@@ -19,6 +19,15 @@ dependencies {
 }
 
 tasks.test {
+    // Gradle's Test task runs in a forked JVM and does not automatically
+    // forward -D system properties given to `./gradlew` on the command
+    // line into that forked worker. CI passes -DsynausonRepoDir=<path>
+    // (see .github/workflows/ci.yml); without this explicit forward,
+    // JSynTestHelpers.resolveSynausonRepo() would read null inside the
+    // actual test JVM and silently fall back to the local-dev relative
+    // path, which doesn't exist under the CI checkout layout.
+    System.getProperty("synausonRepoDir")?.let { systemProperty("synausonRepoDir", it) }
+
     useJUnitPlatform {
         // NativeParticipantStressIT (10s sustained traffic) is excluded from
         // the always-on suite by default — timing-sensitive tests produce
