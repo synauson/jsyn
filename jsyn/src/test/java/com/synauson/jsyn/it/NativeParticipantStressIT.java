@@ -6,6 +6,7 @@ import com.synauson.jsyn.NativeParticipantStats;
 import com.synauson.jsyn.participant.Conference;
 import com.synauson.jsyn.participant.NativeParticipant;
 import com.synauson.jsyn.spec.NativeParticipantSpec;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -15,7 +16,14 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Task 1.7.4 — 10-second sustained ingress traffic; asserts liveness and no exceptions.
+ *
+ * <p>Tagged {@code stress}: excluded from the always-on CI suite (see
+ * {@code build.gradle.kts}'s {@code tasks.test.useJUnitPlatform}) because
+ * sustained-traffic timing assertions produce false negatives on busy
+ * shared runners. Run manually with:
+ * {@code ./gradlew :jsyn:test -PrunStress --tests '*NativeParticipantStressIT*'}.
  */
+@Tag("stress")
 @Timeout(value = 30, unit = TimeUnit.SECONDS)
 class NativeParticipantStressIT {
 

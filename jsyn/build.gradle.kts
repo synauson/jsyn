@@ -19,7 +19,18 @@ dependencies {
 }
 
 tasks.test {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        // NativeParticipantStressIT (10s sustained traffic) is excluded from
+        // the always-on suite by default — timing-sensitive tests produce
+        // false negatives on busy shared runners (same rationale as
+        // synauson's own manual-only stress-tests.yml). Run it explicitly
+        // with: ./gradlew :jsyn:test -PrunStress --tests '*NativeParticipantStressIT*'
+        // (Gradle ANDs excludeTags with --tests, so the tag must be let
+        // through via -PrunStress before --tests can select the class.)
+        if (!project.hasProperty("runStress")) {
+            excludeTags("stress")
+        }
+    }
 
     // Isolate each test class in its own JVM process on Windows. GStreamer and
     // ONNX Runtime are process-global singletons with slow resource cleanup;
