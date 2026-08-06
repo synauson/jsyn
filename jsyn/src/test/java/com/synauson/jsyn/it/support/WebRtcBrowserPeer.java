@@ -38,7 +38,7 @@ public final class WebRtcBrowserPeer implements AutoCloseable {
             "window.__maxAmplitude = 0;",
             "",
             "async function createOffer() {",
-            "  window.__pc = new RTCPeerConnection({iceServers: [{urls: 'stun:stun.l.google.com:19302'}]});",
+            "  window.__pc = new RTCPeerConnection();",
             "  window.__pc.onicecandidate = function(event) {",
             "    if (event.candidate) {",
             "      window.__iceQueue.push({",
@@ -109,8 +109,8 @@ public final class WebRtcBrowserPeer implements AutoCloseable {
      * @param fakeAudioCaptureFile path to a WAV file, or {@code null} for the default tone
      */
     public WebRtcBrowserPeer(String fakeAudioCaptureFile) throws IOException {
-        this.httpServer = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        httpServer.createContext("/", exchange -> {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/", exchange -> {
             byte[] body = PAGE_HTML.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add("Content-Type", "text/html; charset=utf-8");
             exchange.sendResponseHeaders(200, body.length);
@@ -118,19 +118,37 @@ public final class WebRtcBrowserPeer implements AutoCloseable {
                 os.write(body);
             }
         });
-        httpServer.start();
+        server.start();
 
-        List<String> args = new ArrayList<>(List.of(
-                "--use-fake-device-for-media-stream",
-                "--use-fake-ui-for-media-stream"));
-        if (fakeAudioCaptureFile != null) {
-            args.add("--use-file-for-fake-audio-capture=" + fakeAudioCaptureFile);
+        Playwright pw = null;
+        Browser br = null;
+        try {
+            List<String> args = new ArrayList<>(List.of(
+                    "--use-fake-device-for-media-stream",
+                    "--use-fake-ui-for-media-stream"));
+            if (fakeAudioCaptureFile != null) {
+                args.add("--use-file-for-fake-audio-capture=" + fakeAudioCaptureFile);
+            }
+
+            pw = Playwright.create();
+            br = pw.chromium().launch(new BrowserType.LaunchOptions().setArgs(args));
+            Page pg = br.newPage();
+            pg.navigate("http://127.0.0.1:" + server.getAddress().getPort() + "/");
+
+            this.httpServer = server;
+            this.playwright = pw;
+            this.browser = br;
+            this.page = pg;
+        } catch (RuntimeException e) {
+            if (br != null) {
+                br.close();
+            }
+            if (pw != null) {
+                pw.close();
+            }
+            server.stop(0);
+            throw e;
         }
-
-        this.playwright = Playwright.create();
-        this.browser = playwright.chromium().launch(new BrowserType.LaunchOptions().setArgs(args));
-        this.page = browser.newPage();
-        page.navigate("http://127.0.0.1:" + httpServer.getAddress().getPort() + "/");
     }
 
     /** Drive the browser to create a real SDP offer with a real ICE ufrag/DTLS fingerprint. */
@@ -180,9 +198,33 @@ public final class WebRtcBrowserPeer implements AutoCloseable {
 
     @Override
     public void close() {
-        page.close();
-        browser.close();
-        playwright.close();
-        httpServer.stop(0);
+        RuntimeException failure = null;
+        try {
+            page.close();
+        } catch (RuntimeException e) {
+            failure = e;
+        }
+        try {
+            browser.close();
+        } catch (RuntimeException e) {
+            if (failure == null) {
+                failure = e;
+            } else {
+                failure.addSuppressed(e);
+            }
+        }
+        try {
+            playwright.close();
+        } catch (RuntimeException e) {
+            if (failure == null) {
+                failure = e;
+            } else {
+                failure.addSuppressed(e);
+            }
+        }
+        httpServer.stop(0); // does not throw
+        if (failure != null) {
+            throw failure;
+        }
     }
 }
