@@ -35,7 +35,6 @@ public final class WebRtcBrowserPeer implements AutoCloseable {
             "<script>",
             "window.__pc = null;",
             "window.__iceQueue = [];",
-            "window.__maxAmplitude = 0;",
             "",
             "async function createOffer() {",
             "  window.__pc = new RTCPeerConnection();",
@@ -48,21 +47,14 @@ public final class WebRtcBrowserPeer implements AutoCloseable {
             "    }",
             "  };",
             "  window.__pc.ontrack = function(event) {",
-            "    var audioCtx = new AudioContext();",
-            "    var source = audioCtx.createMediaStreamSource(event.streams[0]);",
-            "    var analyser = audioCtx.createAnalyser();",
-            "    analyser.fftSize = 2048;",
-            "    source.connect(analyser);",
-            "    var data = new Uint8Array(analyser.fftSize);",
-            "    setInterval(function() {",
-            "      analyser.getByteTimeDomainData(data);",
-            "      var maxDev = 0;",
-            "      for (var i = 0; i < data.length; i++) {",
-            "        var dev = Math.abs(data[i] - 128);",
-            "        if (dev > maxDev) maxDev = dev;",
-            "      }",
-            "      if (maxDev > window.__maxAmplitude) window.__maxAmplitude = maxDev;",
-            "    }, 20);",
+            "    // Chrome only decodes a remote track once it is attached to a media",
+            "    // element sink; without this the receiver reports zero audio energy",
+            "    // no matter how much RTP arrives. Muted so headless CI stays silent;",
+            "    // kept on window so it is not garbage collected.",
+            "    window.__sink = new Audio();",
+            "    window.__sink.srcObject = event.streams[0];",
+            "    window.__sink.muted = true;",
+            "    window.__sink.play().catch(function() {});",
             "  };",
             "  var stream = await navigator.mediaDevices.getUserMedia({audio: true});",
             "  stream.getTracks().forEach(function(t) { window.__pc.addTrack(t, stream); });",
@@ -85,8 +77,18 @@ public final class WebRtcBrowserPeer implements AutoCloseable {
             "  return q;",
             "}",
             "",
-            "function maxObservedAmplitude() {",
-            "  return window.__maxAmplitude;",
+            "async function receivedAudioEnergy() {",
+            "  if (!window.__pc) { return 0; }",
+            "  var stats = await window.__pc.getStats();",
+            "  var best = 0;",
+            "  stats.forEach(function(report) {",
+            "    if (report.type === 'inbound-rtp'",
+            "        && typeof report.totalAudioEnergy === 'number'",
+            "        && report.totalAudioEnergy > best) {",
+            "      best = report.totalAudioEnergy;",
+            "    }",
+            "  });",
+            "  return best;",
             "}",
             "</script>",
             "</body></html>"
@@ -175,15 +177,23 @@ public final class WebRtcBrowserPeer implements AutoCloseable {
     }
 
     /**
-     * Polls the browser's incoming-audio amplitude meter until it exceeds a
-     * non-silence threshold or {@code within} elapses.
+     * Polls the receiver's {@code inbound-rtp.totalAudioEnergy} statistic until
+     * it exceeds a non-silence threshold or {@code within} elapses.
+     *
+     * <p>This reads the decoded-audio energy the browser's own WebRTC receiver
+     * accumulated, rather than sampling an {@code AnalyserNode}: Chrome does not
+     * reliably feed a remote WebRTC track into a {@code MediaStreamAudioSourceNode},
+     * so the Web Audio route reports pure silence even while
+     * {@code getStats()} shows a near-full-scale {@code audioLevel}.
      */
     public boolean receivedNonSilentAudio(Duration within) {
         long deadline = System.currentTimeMillis() + within.toMillis();
         while (System.currentTimeMillis() < deadline) {
-            Object result = page.evaluate("() => maxObservedAmplitude()");
-            double amplitude = ((Number) result).doubleValue();
-            if (amplitude > 10.0) { // out of a possible 0-128 deviation range
+            Object result = page.evaluate("() => receivedAudioEnergy()");
+            double energy = ((Number) result).doubleValue();
+            // totalAudioEnergy accumulates level^2 * duration and stays exactly
+            // 0.0 for a silent (or never-decoded) stream.
+            if (energy > 0.05) {
                 return true;
             }
             try {
