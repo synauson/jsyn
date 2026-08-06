@@ -48,6 +48,9 @@ jobs:
     runs-on: ubuntu-24.04
     needs: java-compile
     timeout-minutes: 30
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.playwright-browsers
+      PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS: "1"
     steps:
       - uses: actions/checkout@v4
 
@@ -79,6 +82,12 @@ jobs:
           sudo mv /opt/onnxruntime-linux-x64-1.24.4 /opt/onnxruntime
           sudo ln -s /opt/onnxruntime/lib/libonnxruntime.so.1.24.4 /usr/lib/libonnxruntime.so
 
+      - name: Cache Playwright Chromium
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.PLAYWRIGHT_BROWSERS_PATH }}
+          key: ${{ runner.os }}-playwright-chromium-1.47.0
+
       - name: Set up Temurin 11
         uses: actions/setup-java@v4
         with:
@@ -94,6 +103,11 @@ jobs:
           key: ${{ runner.os }}-gradle-test-${{ hashFiles('**/*.gradle*', 'gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: |
             ${{ runner.os }}-gradle-test-
+
+      - name: Install Playwright Chromium
+        env:
+          INSTALL_PLAYWRIGHT_DEPS: "1"
+        run: ./gradlew :jsyn:installPlaywrightBrowsers --no-daemon --console=plain
 
       - name: gradle :jsyn:test
         env:
@@ -112,6 +126,8 @@ jobs:
     runs-on: windows-2022
     needs: java-compile
     timeout-minutes: 45
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.playwright-browsers
     steps:
       - uses: actions/checkout@v4
 
@@ -171,6 +187,12 @@ jobs:
           }
           "C:\ort\onnxruntime-win-x64-1.24.4\lib" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
 
+      - name: Cache Playwright Chromium
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.PLAYWRIGHT_BROWSERS_PATH }}
+          key: ${{ runner.os }}-playwright-chromium-1.47.0
+
       - name: Set up Temurin 11
         uses: actions/setup-java@v4
         with:
@@ -186,6 +208,10 @@ jobs:
           key: ${{ runner.os }}-gradle-test-${{ hashFiles('**/*.gradle*', 'gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: |
             ${{ runner.os }}-gradle-test-
+
+      - name: Install Playwright Chromium
+        shell: pwsh
+        run: ./gradlew.bat :jsyn:installPlaywrightBrowsers --no-daemon --console=plain
 
       - name: gradle :jsyn:test
         env:
