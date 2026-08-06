@@ -17,6 +17,20 @@ allprojects {
             }
         }
     }
+
+    // jsyn-natives-* is consumed as 1.0.0-SNAPSHOT, a *changing* module: the
+    // coordinates stay fixed while synauson republishes new content behind
+    // them. Gradle caches changing modules for 24 hours by default, and CI
+    // restores ~/.gradle/caches across runs via actions/cache restore-keys —
+    // so a cache seeded by an earlier run keeps serving that run's native to
+    // every later run inside the TTL, silently testing a stale binary. That
+    // is not hypothetical: run 31062486992 tested build 3 of the native and
+    // failed three SIP tests against synauson bugs already fixed in build 8.
+    // A zero TTL makes every build re-check maven-metadata.xml (one cheap
+    // Nexus round-trip) so "SNAPSHOT" actually means current.
+    configurations.all {
+        resolutionStrategy.cacheChangingModulesFor(0, "seconds")
+    }
 }
 
 subprojects {
