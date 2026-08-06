@@ -107,6 +107,8 @@ jobs:
       - name: Install Playwright Chromium
         env:
           INSTALL_PLAYWRIGHT_DEPS: "1"
+          NEXUS_USER: ${{ secrets.NEXUS_USER }}
+          NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
         run: ./gradlew :jsyn:installPlaywrightBrowsers --no-daemon --console=plain
 
       - name: gradle :jsyn:test
@@ -210,6 +212,9 @@ jobs:
             ${{ runner.os }}-gradle-test-
 
       - name: Install Playwright Chromium
+        env:
+          NEXUS_USER: ${{ secrets.NEXUS_USER }}
+          NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
         shell: pwsh
         run: ./gradlew.bat :jsyn:installPlaywrightBrowsers --no-daemon --console=plain
 
