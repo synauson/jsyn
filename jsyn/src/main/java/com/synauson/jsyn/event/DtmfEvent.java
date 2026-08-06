@@ -18,9 +18,24 @@ public final class DtmfEvent {
     public final String participantId;
     /** Single-character digit string: {@code "0"}-{@code "9"}, {@code "*"}, {@code "#"}, or {@code "A"}-{@code "D"}. */
     public final String digit;
-    /** Digit duration in milliseconds, as reported by the RTP event packet. */
+    /**
+     * Digit duration in milliseconds. Always {@code 0} for received events:
+     * neither the RFC 4733 depayloader ({@code rtpdtmfdepay}) nor the
+     * in-band tone detector ({@code dtmfdetect}) report a duration for a
+     * detected digit (see {@code synauson-core/src/conference/actor.rs}'s
+     * {@code handle_dtmf_bus_message}). Present for symmetry with
+     * {@code SipParticipantHandle#sendDtmf}'s {@code durationMs} parameter,
+     * which does control the outbound event's duration.
+     */
     public final long durationMs;
-    /** {@code true} if received in-band (RFC 4733 RTP event), {@code false} if out-of-band. */
+    /**
+     * {@code true} if detected in-band via audio-domain tone detection
+     * ({@code dtmfdetect}), {@code false} if received via the RFC 4733
+     * RTP event stream ({@code rtpdtmfdepay}) — i.e. RFC 4733 is
+     * out-of-band, matching standard telecom terminology. This is the
+     * opposite of what the name might suggest at a glance; verified
+     * against {@code synauson-core}'s {@code handle_dtmf_bus_message}.
+     */
     public final boolean inBand;
 
     /**
@@ -29,8 +44,9 @@ public final class DtmfEvent {
      * @param conferenceId  conference identifier; non-null
      * @param participantId participant identifier; non-null
      * @param digit         single-character digit string
-     * @param durationMs    digit duration in milliseconds
-     * @param inBand        {@code true} if received in-band via RFC 4733
+     * @param durationMs    digit duration in milliseconds; always {@code 0} for received events
+     * @param inBand        {@code true} if detected in-band via {@code dtmfdetect}; {@code false}
+     *                      for RFC 4733 (out-of-band)
      */
     public DtmfEvent(String conferenceId, String participantId, String digit,
                      long durationMs, boolean inBand) {
