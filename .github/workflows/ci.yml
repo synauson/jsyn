@@ -119,6 +119,16 @@ jobs:
           ./gradlew :jsyn:test --no-daemon --console=plain \
             -DsynausonRepoDir="${{ github.workspace }}/synauson-repo"
 
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-linux
+          path: |
+            jsyn/build/test-results/test/*.xml
+            jsyn/build/reports/tests/test/
+          retention-days: 14
+
   # -------------------------------------------------------------------------
   # Same IT suite as test-linux, on Windows. Uses only the GStreamer runtime
   # MSI (not the devel MSI) — jsyn doesn't compile anything, it only needs
@@ -226,6 +236,16 @@ jobs:
         run: |
           ./gradlew.bat :jsyn:test --no-daemon --console=plain `
             "-DsynausonRepoDir=${{ github.workspace }}\synauson-repo"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-windows
+          path: |
+            jsyn/build/test-results/test/*.xml
+            jsyn/build/reports/tests/test/
+          retention-days: 14
 
   # -------------------------------------------------------------------------
   # Publish com.synauson:jsyn:1.0.0-SNAPSHOT to Nexus on every push to main.
