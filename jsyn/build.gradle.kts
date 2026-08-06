@@ -2,6 +2,7 @@ dependencies {
     api("com.google.code.gson:gson:2.11.0")
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.3")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    testImplementation("com.microsoft.playwright:playwright:1.47.0")
     // Native artifacts are pre-built platform JARs published separately by the
     // synauson build system. NativeLoader picks the right .so/.dll at JVM startup
     // from os.name / os.arch, so both can be on the classpath simultaneously.
@@ -50,5 +51,18 @@ tasks.test {
     if (System.getProperty("os.name").lowercase().contains("windows")) {
         forkEvery = 1  // Restart JVM after every 1 test class
         maxParallelForks = 1  // Only one JVM at a time
+    }
+}
+
+tasks.register<JavaExec>("installPlaywrightBrowsers") {
+    group = "verification"
+    description = "Downloads the Chromium build Playwright drives for WebRtcMediaE2eIT. " +
+        "Set INSTALL_PLAYWRIGHT_DEPS=1 to also install Linux OS-level dependencies (CI only)."
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("com.microsoft.playwright.CLI")
+    args = if (System.getenv("INSTALL_PLAYWRIGHT_DEPS") == "1") {
+        listOf("install", "chromium", "--with-deps")
+    } else {
+        listOf("install", "chromium")
     }
 }
