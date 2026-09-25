@@ -31,9 +31,9 @@ import static org.junit.jupiter.api.Assertions.*;
  *   <li>The observer is never called during sends (no phantom events).</li>
  * </ol>
  */
-// 30s like the other SIP ITs. The budget includes JSyn start-up, and on Windows
-// every test class starts a fresh JVM (forkEvery = 1), so a class that runs
-// early on a fresh runner also pays the cold GStreamer plugin scan.
+// 30s like the other SIP ITs. The budget includes JSyn start-up; on Windows CI
+// the cold GStreamer plugin scan is paid up front by ci.yml's "Build GStreamer
+// plugin registry" step, not here.
 @Timeout(value = 30, unit = TimeUnit.SECONDS)
 class DtmfEventsIT {
 

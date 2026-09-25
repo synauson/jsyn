@@ -118,6 +118,9 @@ Install GStreamer 1.26.7 MSVC **system-wide**. ONNX Runtime is bundled in the JA
    }
    ```
 4. Reboot or sign out/in to refresh PATH for new processes.
+5. Once per Windows user account, build the GStreamer plugin registry: `gst-inspect-1.0.exe coreelements`.
+   The first GStreamer init on a machine scans every installed plugin, which took 7–44 s on fresh CI
+   runners; skip this and the scan happens inside the first `new JSyn(...)`.
 
 Verify with: `gst-launch-1.0.exe --version` from a fresh PowerShell prompt.
 
@@ -225,6 +228,7 @@ the system install.
 | `UnsatisfiedLinkError: missing native: com/synauson/jsyn/natives/...` | `jsyn-natives-<platform>` not on classpath | Add the `runtimeOnly` dependency for your OS |
 | `Can't find gstreamer-1.0-0.dll` (Windows) | GStreamer not installed or PATH not refreshed | Install per the Windows section above; reboot |
 | Process exits silently on first `JSyn` construction | ORT model file missing or wrong filename | Verify `silero_vad.onnx` and `smart_turn.onnx` are directly under `modelsDir` |
+| First `new JSyn(...)` on Windows takes tens of seconds | GStreamer is building its plugin registry | Run `gst-inspect-1.0.exe coreelements` once after install (Windows step 5) |
 | `UnsatisfiedLinkError: msvcr100.dll missing` | Old MSVC runtime missing | Install Visual C++ Redistributable for VS 2015–2022 |
 
 For deeper diagnostics, run with `-Djsyn.log=trace` to enable native-side tracing output on stderr.
