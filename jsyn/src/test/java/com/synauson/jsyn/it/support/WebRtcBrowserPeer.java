@@ -77,6 +77,22 @@ public final class WebRtcBrowserPeer implements AutoCloseable {
             "  return q;",
             "}",
             "",
+            "function connectionState() {",
+            "  return window.__pc ? window.__pc.connectionState : 'none';",
+            "}",
+            "",
+            "async function receivedPackets() {",
+            "  if (!window.__pc) { return 0; }",
+            "  var stats = await window.__pc.getStats();",
+            "  var packets = 0;",
+            "  stats.forEach(function(report) {",
+            "    if (report.type === 'inbound-rtp' && typeof report.packetsReceived === 'number') {",
+            "      packets += report.packetsReceived;",
+            "    }",
+            "  });",
+            "  return packets;",
+            "}",
+            "",
             "async function receivedAudioEnergy() {",
             "  if (!window.__pc) { return 0; }",
             "  var stats = await window.__pc.getStats();",
@@ -174,6 +190,16 @@ public final class WebRtcBrowserPeer implements AutoCloseable {
     public List<Map<String, Object>> drainLocalIceCandidates() {
         Object result = page.evaluate("() => drainIceCandidates()");
         return result == null ? new ArrayList<>() : (List<Map<String, Object>>) result;
+    }
+
+    /** The peer connection's {@code connectionState} ({@code "connected"} once ICE and DTLS are up). */
+    public String connectionState() {
+        return (String) page.evaluate("() => connectionState()");
+    }
+
+    /** Total RTP packets the browser's receiver has taken in from synauson so far. */
+    public long receivedPackets() {
+        return ((Number) page.evaluate("() => receivedPackets()")).longValue();
     }
 
     /**
