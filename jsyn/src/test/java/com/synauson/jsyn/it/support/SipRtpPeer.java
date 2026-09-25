@@ -46,7 +46,8 @@ public final class SipRtpPeer implements AutoCloseable {
     private final Thread receiveThread;
 
     private volatile InetAddress targetAddress;
-    private volatile int targetPort = -1;
+    private volatile int[] targetPorts = new int[0];
+    private volatile Thread toneThread;
 
     public SipRtpPeer() throws IOException {
         this.socket = new DatagramSocket(0);
@@ -64,8 +65,72 @@ public final class SipRtpPeer implements AutoCloseable {
 
     /** Set where {@link #sendAudioFrame} / {@link #sendDtmfEvent} deliver packets to. */
     public void setTarget(String host, int port) throws IOException {
+        setTargets(host, new int[] {port});
+    }
+
+    /**
+     * Deliver every packet to each of {@code ports}. Lets a test send early
+     * media before synauson has told it which of a few candidate ports its
+     * participant will be given; call {@link #setTarget} once it knows.
+     */
+    public void setTargets(String host, int[] ports) throws IOException {
         this.targetAddress = InetAddress.getByName(host);
-        this.targetPort = port;
+        this.targetPorts = ports.clone();
+    }
+
+    /**
+     * Start streaming a continuous {@code freqHz} sine (peak 12000, before
+     * mu-law) as 20 ms PCMU frames on a background thread, paced against the
+     * wall clock like a real endpoint. Runs until {@link #stopTone()} or
+     * {@link #close()}.
+     */
+    public synchronized void startTone(double freqHz) {
+        requireTarget();
+        stopTone();
+        Thread t = new Thread(() -> streamTone(freqHz), "sip-rtp-peer-tone-" + socket.getLocalPort());
+        t.setDaemon(true);
+        toneThread = t;
+        t.start();
+    }
+
+    /** Stop a tone started with {@link #startTone}; a no-op when none is running. */
+    public synchronized void stopTone() {
+        Thread t = toneThread;
+        toneThread = null;
+        if (t != null) {
+            t.interrupt();
+            try {
+                t.join(1000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+
+    private void streamTone(double freqHz) {
+        byte[] frame = new byte[SAMPLES_PER_PACKET_8KHZ * 2];
+        long sample = 0;
+        long start = System.nanoTime();
+        try {
+            for (long f = 0; toneThread == Thread.currentThread(); f++) {
+                for (int i = 0; i < SAMPLES_PER_PACKET_8KHZ; i++, sample++) {
+                    short s = (short) (12_000.0 * Math.sin(2.0 * Math.PI * freqHz * sample / 8000.0));
+                    frame[i * 2] = (byte) (s & 0xFF);
+                    frame[i * 2 + 1] = (byte) ((s >> 8) & 0xFF);
+                }
+                sendAudioFrame(frame);
+                long sleepNanos = start + (f + 1) * PACKETIZATION_INTERVAL_MS * 1_000_000L - System.nanoTime();
+                if (sleepNanos > 0) {
+                    Thread.sleep(sleepNanos / 1_000_000L, (int) (sleepNanos % 1_000_000L));
+                }
+            }
+        } catch (InterruptedException e) {
+            // stopTone()
+        } catch (IOException e) {
+            if (running.get()) {
+                receiveLoopFailure.compareAndSet(null, e);
+            }
+        }
     }
 
     private void receiveLoop() {
@@ -174,13 +239,15 @@ public final class SipRtpPeer implements AutoCloseable {
     }
 
     private void requireTarget() {
-        if (targetAddress == null || targetPort < 0) {
+        if (targetAddress == null || targetPorts.length == 0) {
             throw new IllegalStateException("setTarget(host, port) must be called before sending");
         }
     }
 
     private void send(byte[] wire) throws IOException {
-        socket.send(new DatagramPacket(wire, wire.length, targetAddress, targetPort));
+        for (int port : targetPorts) {
+            socket.send(new DatagramPacket(wire, wire.length, targetAddress, port));
+        }
     }
 
     /** Snapshot of every RTP packet received at this peer's bound port so far. */
@@ -188,8 +255,14 @@ public final class SipRtpPeer implements AutoCloseable {
         return new ArrayList<>(captured);
     }
 
+    /** Forget every packet captured so far, to measure only what arrives next. */
+    public void clearCaptured() {
+        captured.clear();
+    }
+
     @Override
     public void close() {
+        stopTone();
         running.set(false);
         try {
             receiveThread.join(1000);

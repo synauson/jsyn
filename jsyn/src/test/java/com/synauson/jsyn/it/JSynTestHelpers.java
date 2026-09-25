@@ -44,7 +44,20 @@ final class JSynTestHelpers {
 
     /** Create a new JSyn instance with a unique RTP port range. */
     static JSyn newJSyn() {
-        int rtpMin = PORT_BASE.getAndAdd(200);
+        return newJSyn(nextRtpPortMin());
+    }
+
+    /**
+     * Reserve a unique 200-port RTP range for one JSyn instance and return
+     * its (even) lower bound; pass it to {@link #newJSyn(int)}. Tests that
+     * need to know which ports synauson will allocate from use this pair.
+     */
+    static int nextRtpPortMin() {
+        return PORT_BASE.getAndAdd(200);
+    }
+
+    /** Create a new JSyn instance allocating RTP ports from {@code [rtpMin, rtpMin + 199]}. */
+    static JSyn newJSyn(int rtpMin) {
         return new JSyn(JSynConfig.builder()
                 .modelsDir(resolveSynausonRepo().resolve("models").toString())
                 .rtpPortMin(rtpMin)

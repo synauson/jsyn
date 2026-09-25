@@ -10,7 +10,7 @@ dependencies {
     // nativesVersion is pinned independently of jsyn's own version so jsyn can
     // advance without requiring a new synauson/natives release. Only bump this
     // when jsyn adds JNI calls that require a newer compiled native.
-    val nativesVersion = findProperty("jsynNativesVersion") as String? ?: "1.1.2"
+    val nativesVersion = findProperty("jsynNativesVersion") as String? ?: "1.1.3"
     val osName = System.getProperty("os.name").lowercase()
     if (osName.contains("windows")) {
         testRuntimeOnly("com.synauson:jsyn-natives-windows:${nativesVersion}")
