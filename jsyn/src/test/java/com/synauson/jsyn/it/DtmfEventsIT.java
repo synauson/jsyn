@@ -8,6 +8,8 @@ import com.synauson.jsyn.participant.SipParticipantHandle;
 import com.synauson.jsyn.spec.SipParticipantSpec;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.extension.ExtendWith;
+import com.synauson.jsyn.it.support.HangDumpExtension;
 
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -35,14 +37,24 @@ import static org.junit.jupiter.api.Assertions.*;
 // every test class starts a fresh JVM (forkEvery = 1), so a class that runs
 // early on a fresh runner also pays the cold GStreamer plugin scan.
 @Timeout(value = 30, unit = TimeUnit.SECONDS)
+@ExtendWith(HangDumpExtension.class)
 class DtmfEventsIT {
+    private static final long T0 = System.nanoTime();
+    private static void mark(String what) {
+        System.err.printf("[dtmf-it +%dms] %s%n", (System.nanoTime() - T0) / 1_000_000, what);
+    }
+
 
     @Test
     void dtmfSubscriptionOpensAndSendDigitsAccepted() throws Exception {
+        mark("start");
         String confId = "dtmf-it-" + System.nanoTime();
 
-        try (JSyn syn = JSynTestHelpers.newJSyn();
+        JSyn syn0 = JSynTestHelpers.newJSyn();
+        mark("JSyn constructed");
+        try (JSyn syn = syn0;
              Conference conf = syn.startConference(confId)) {
+            mark("conference started");
 
             SipParticipantHandle sip = conf.addSipParticipant(
                     SipParticipantSpec.builder()
@@ -52,6 +64,7 @@ class DtmfEventsIT {
                             .codec("PCMU")
                             .dtmfPayloadType(101)
                             .build());
+            mark("sip participant added");
 
             AtomicInteger observerCallCount = new AtomicInteger(0);
 
@@ -64,6 +77,7 @@ class DtmfEventsIT {
                 for (char digit : validDigits) {
                     assertDoesNotThrow(() -> sip.sendDtmf(digit, 100),
                             "sendDtmf('" + digit + "') should not throw");
+                    mark("sent " + digit);
                 }
 
                 // Invalid characters must be rejected.
@@ -77,6 +91,8 @@ class DtmfEventsIT {
                     "observer should not receive phantom DTMF events without an RTP loopback");
 
             conf.removeParticipant("dtmf-sip");
+            mark("participant removed");
         }
+        mark("conference and JSyn closed");
     }
 }

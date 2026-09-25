@@ -1,0 +1,111 @@
+name: debug-dtmf-hang
+
+# Temporary: loops DtmfEventsIT on fresh Windows runners with a hang dump.
+on:
+  push:
+    branches: [debug-dtmf-windows-hang]
+
+jobs:
+  loop:
+    runs-on: windows-2022
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+    env:
+      NEXUS_USER: ${{ secrets.NEXUS_USER }}
+      NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout synauson (models + fixtures)
+        uses: actions/checkout@v4
+        with:
+          repository: synauson/synauson
+          token: ${{ secrets.SYNAUSON_REPO_TOKEN }}
+          path: synauson-repo
+
+      - name: Cache GStreamer + ORT installer downloads
+        id: cache-deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/gst-runtime.msi
+            ~/onnxruntime-win-x64.zip
+          key: win-test-deps-gst-1.26.7-ort-1.24.4-v1
+
+      - name: Download deps (cache miss only)
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          Start-BitsTransfer -Source "https://gstreamer.freedesktop.org/data/pkg/windows/1.26.7/msvc/gstreamer-1.0-msvc-x86_64-1.26.7.msi" -Destination (Join-Path $HOME 'gst-runtime.msi')
+          Start-BitsTransfer -Source "https://github.com/microsoft/onnxruntime/releases/download/v1.24.4/onnxruntime-win-x64-1.24.4.zip" -Destination "$HOME/onnxruntime-win-x64.zip"
+
+      - name: Install GStreamer runtime + ORT
+        shell: pwsh
+        run: |
+          $proc = Start-Process msiexec.exe -Wait -PassThru -ArgumentList @(
+            '/i', (Join-Path $HOME 'gst-runtime.msi'), '/quiet', '/norestart', 'ADDLOCAL=ALL', 'INSTALLDIR=C:\gstreamer\')
+          if ($proc.ExitCode -ne 0) { throw "msiexec failed with exit code $($proc.ExitCode)" }
+          "C:\gstreamer\1.0\msvc_x86_64\bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          New-Item -ItemType Directory -Force -Path C:\ort | Out-Null
+          Expand-Archive -Path "$HOME/onnxruntime-win-x64.zip" -DestinationPath C:\ort -Force
+          "C:\ort\onnxruntime-win-x64-1.24.4\lib" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+
+      - name: Find cdb
+        shell: pwsh
+        run: |
+          $cdb = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\Debuggers' -Recurse -Filter cdb.exe -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -like '*x64*' } | Select-Object -First 1
+          Write-Host "cdb: $($cdb.FullName)"
+          "CDB=$($cdb.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "gstreamer registry dir exists: $(Test-Path "$env:LOCALAPPDATA\gstreamer-1.0")"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-test-${{ hashFiles('**/*.gradle*', 'gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-test-
+
+      - name: Compile tests
+        shell: pwsh
+        run: ./gradlew.bat :jsyn:testClasses --no-daemon --console=plain
+
+      - name: Loop DtmfEventsIT
+        shell: pwsh
+        run: |
+          $env:GST_DEBUG_NO_COLOR = '1'
+          $env:GST_DEBUG = '*:2,GST_REGISTRY:4,GST_PLUGIN_LOADING:4'
+          New-Item -ItemType Directory -Force -Path loop | Out-Null
+          # 1 = fresh runner (as in CI), 2-4 = registry deleted, 5-6 = warm.
+          foreach ($i in 1..6) {
+            if ($i -ge 2 -and $i -le 4) { Remove-Item -Recurse -Force "$env:LOCALAPPDATA\gstreamer-1.0" -ErrorAction SilentlyContinue }
+            $env:GST_DEBUG_FILE = "$PWD\loop\gst-$i.log"
+            ./gradlew.bat :jsyn:test --tests '*DtmfEventsIT*' --rerun --no-daemon --console=plain `
+              "-DsynausonRepoDir=${{ github.workspace }}\synauson-repo" "-Djsyn.cdb=$env:CDB" *> "loop\gradle-$i.txt"
+            $xml = Get-Content jsyn/build/test-results/test/TEST-com.synauson.jsyn.it.DtmfEventsIT.xml -Raw
+            $t = [regex]::Match($xml, 'testsuite [^>]*time="([^"]*)"').Groups[1].Value
+            $f = [regex]::Match($xml, 'failures="([0-9]+)"').Groups[1].Value
+            Write-Host "RESULT shard=${{ matrix.shard }} iter=$i time=$t failures=$f"
+            Copy-Item jsyn/build/test-results/test/TEST-com.synauson.jsyn.it.DtmfEventsIT.xml "loop\junit-$i.xml"
+            Select-String -Path "loop\gradle-$i.txt" -Pattern 'dtmf-it \+' | ForEach-Object { $_.Line }
+            if ($f -ne '0') { Get-Content "loop\gradle-$i.txt" }
+          }
+          if (Test-Path jsyn/build/hang-dumps) { Copy-Item -Recurse jsyn/build/hang-dumps loop/ }
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dtmf-loop-${{ matrix.shard }}
+          path: loop/
+          retention-days: 7

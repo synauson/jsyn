@@ -28,6 +28,11 @@ tasks.test {
     // actual test JVM and silently fall back to the local-dev relative
     // path, which doesn't exist under the CI checkout layout.
     System.getProperty("synausonRepoDir")?.let { systemProperty("synausonRepoDir", it) }
+    // debug-dtmf-windows-hang: forward hang-dump settings and show test stderr.
+    listOf("jsyn.cdb", "jsyn.hangDumpAfterMs").forEach { k ->
+        System.getProperty(k)?.let { systemProperty(k, it) }
+    }
+    testLogging { showStandardStreams = true }
 
     useJUnitPlatform {
         // NativeParticipantStressIT (10s sustained traffic) is excluded from
