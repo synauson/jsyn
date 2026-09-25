@@ -2,6 +2,7 @@ package com.synauson.jsyn.participant;
 
 import com.synauson.jsyn.NativeAudioFormat;
 import com.synauson.jsyn.NativeParticipantStats;
+import com.synauson.jsyn.internal.Args;
 import com.synauson.jsyn.internal.NativeBridge;
 import com.synauson.jsyn.internal.NativeParticipantNativeHandle;
 import com.synauson.jsyn.internal.NativeResource;
@@ -40,16 +41,22 @@ public final class NativeParticipant extends NativeResource {
      * @param conferenceId  conference identifier
      * @param participantId participant identifier
      * @param nativeHandle  raw JNI result containing the handle and ring buffers
+     * @throws com.synauson.jsyn.exception.InvalidArgumentException if any argument is null
      */
     public NativeParticipant(String conferenceId, String participantId,
                               NativeParticipantNativeHandle nativeHandle) {
-        super(() -> NativeBridge.closeNativeParticipant(nativeHandle.handle));
-        this.conferenceId = conferenceId;
-        this.participantId = participantId;
+        super(closer(Args.notNull(nativeHandle, "nativeHandle").handle));
+        this.conferenceId = Args.notNull(conferenceId, "conferenceId");
+        this.participantId = Args.notNull(participantId, "participantId");
         this.npHandle = nativeHandle.handle;
         this.format = NativeAudioFormat.fromId(nativeHandle.formatId);
         this.ingressRing = new SpscRing(nativeHandle.ingressRing);
         this.egressRing  = new SpscRing(nativeHandle.egressRing);
+    }
+
+    // Reads the handle before super() so a null nativeHandle never reaches the Cleaner.
+    private static Runnable closer(long npHandle) {
+        return () -> NativeBridge.closeNativeParticipant(npHandle);
     }
 
     /**
@@ -81,9 +88,11 @@ public final class NativeParticipant extends NativeResource {
      * @param len number of bytes to write
      * @return bytes actually written; may be less than {@code len} if the ring is full
      * @throws com.synauson.jsyn.exception.NativeResourceClosedException if already closed
+     * @throws com.synauson.jsyn.exception.InvalidArgumentException if {@code src} is null
      */
     public int write(byte[] src, int off, int len) {
         requireOpen();
+        Args.notNull(src, "src");
         return ingressRing.write(src, off, len);
     }
 
@@ -95,9 +104,11 @@ public final class NativeParticipant extends NativeResource {
      * @param len maximum bytes to read
      * @return bytes actually read; may be less than {@code len} if the ring is empty
      * @throws com.synauson.jsyn.exception.NativeResourceClosedException if already closed
+     * @throws com.synauson.jsyn.exception.InvalidArgumentException if {@code dst} is null
      */
     public int read(byte[] dst, int off, int len) {
         requireOpen();
+        Args.notNull(dst, "dst");
         return egressRing.read(dst, off, len);
     }
 

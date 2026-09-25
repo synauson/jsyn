@@ -1,6 +1,7 @@
 package com.synauson.jsyn.spec;
 
-import java.util.Objects;
+import com.synauson.jsyn.internal.Args;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Spec for reserving a SIP participant's local RTP/RTCP ports before the peer's media is
@@ -23,10 +24,10 @@ public final class SipReservationSpec {
      * advertised in the offer's {@code a=crypto} line and used to encrypt what we send;
      * {@code null} for plain RTP. When set, the connect call must carry the peer's key.
      */
-    public final byte[] ourSrtpKey;
+    public final byte @Nullable [] ourSrtpKey;
 
     private SipReservationSpec(Builder b) {
-        this.participantId = Objects.requireNonNull(b.participantId, "participantId");
+        this.participantId = Args.notNull(b.participantId, "participantId");
         this.ourSrtpKey = b.ourSrtpKey == null ? null : b.ourSrtpKey.clone();
     }
 
@@ -43,8 +44,8 @@ public final class SipReservationSpec {
      * @since 1.2.0
      */
     public static final class Builder {
-        private String participantId;
-        private byte[] ourSrtpKey;
+        private @Nullable String participantId;
+        private byte @Nullable [] ourSrtpKey;
 
         /**
          * Set the participant ID. Required.
@@ -60,14 +61,20 @@ public final class SipReservationSpec {
          * @param key our 30-byte SRTP master key, or {@code null} for plain RTP
          * @return this builder
          */
-        public Builder ourSrtpKey(byte[] key) { this.ourSrtpKey = key; return this; }
+        public Builder ourSrtpKey(byte @Nullable [] key) { this.ourSrtpKey = key; return this; }
 
         /**
          * Materialise an immutable {@link SipReservationSpec}.
          *
          * @return the configured spec
-         * @throws NullPointerException if {@code participantId} is null
+         * @throws com.synauson.jsyn.exception.InvalidArgumentException naming every required
+         *         field that is missing
          */
-        public SipReservationSpec build() { return new SipReservationSpec(this); }
+        public SipReservationSpec build() {
+            Args.required("SipReservationSpec")
+                .field("participantId", participantId)
+                .validate();
+            return new SipReservationSpec(this);
+        }
     }
 }

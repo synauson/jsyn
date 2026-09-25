@@ -1,10 +1,10 @@
 package com.synauson.jsyn;
 
+import com.synauson.jsyn.internal.Args;
 import com.synauson.jsyn.internal.NativeBridge;
 import com.synauson.jsyn.internal.NativeLoader;
 import com.synauson.jsyn.internal.NativeResource;
 import com.synauson.jsyn.participant.Conference;
-import java.util.Objects;
 
 /**
  * Entry point for the jsyn in-process media server.
@@ -41,6 +41,7 @@ public final class JSyn extends NativeResource {
      * ONNX Runtime are initialised.
      *
      * @param config the runtime configuration
+     * @throws com.synauson.jsyn.exception.InvalidArgumentException if {@code config} is null
      * @throws UnsatisfiedLinkError if the native libraries are missing from the classpath
      * @throws com.synauson.jsyn.exception.InternalException if the GStreamer sanity check fails
      *         or the runtime cannot be initialised
@@ -55,7 +56,7 @@ public final class JSyn extends NativeResource {
     }
 
     private static long initAndGetHandle(JSynConfig config) {
-        Objects.requireNonNull(config, "config");
+        Args.notNull(config, "config");
         NativeLoader.load();
         // Sanity-check GStreamer element registry before first use.
         String sanityError = NativeBridge.gstreamerSanityCheck();
@@ -78,6 +79,8 @@ public final class JSyn extends NativeResource {
      *
      * @param conferenceId the unique conference identifier
      * @return a conference handle
+     * @throws com.synauson.jsyn.exception.InvalidArgumentException if {@code conferenceId}
+     *         is null
      * @throws com.synauson.jsyn.exception.AlreadyExistsException if a conference
      *         with this ID already exists
      * @throws com.synauson.jsyn.exception.LimitExceededException if the
@@ -87,7 +90,7 @@ public final class JSyn extends NativeResource {
      */
     public Conference startConference(String conferenceId) {
         requireOpen();
-        Objects.requireNonNull(conferenceId, "conferenceId");
+        Args.notNull(conferenceId, "conferenceId");
         NativeBridge.startConference(runtimeHandle, conferenceId);
         return new Conference(runtimeHandle, conferenceId);
     }

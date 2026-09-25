@@ -1,6 +1,6 @@
 package com.synauson.jsyn.participant;
 
-import java.util.Objects;
+import com.synauson.jsyn.internal.Args;
 
 /**
  * Handle to a recording participant returned by
@@ -21,10 +21,10 @@ public final class RecordingParticipantHandle {
      * rarely constructed from application code.
      *
      * @param participantId the participant identifier; non-null
-     * @throws NullPointerException if {@code participantId} is null
+     * @throws com.synauson.jsyn.exception.InvalidArgumentException if {@code participantId} is null
      */
     public RecordingParticipantHandle(String participantId) {
-        this.participantId = Objects.requireNonNull(participantId, "participantId");
+        this.participantId = Args.notNull(participantId, "participantId");
     }
 
     /**

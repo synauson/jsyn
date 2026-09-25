@@ -1,10 +1,10 @@
 package com.synauson.jsyn.spec;
 
+import com.synauson.jsyn.internal.Args;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
 
 /**
  * Full N-to-M audio routing matrix for a conference.
@@ -27,20 +27,30 @@ public final class ConnectionMatrix {
      * in {@link Collections#unmodifiableList(List)}.
      *
      * @param entries entries to include; non-null
-     * @throws NullPointerException if {@code entries} is null
+     * @throws com.synauson.jsyn.exception.InvalidArgumentException if {@code entries} or any of
+     *         its elements is null
      */
     public ConnectionMatrix(List<ConnectionEntry> entries) {
-        this.entries = Collections.unmodifiableList(new ArrayList<>(
-            Objects.requireNonNull(entries, "entries")));
+        this.entries = copyOf(Args.notNull(entries, "entries"));
     }
 
     /**
      * Construct a matrix from a varargs sequence of entries.
      *
      * @param entries entries to include
+     * @throws com.synauson.jsyn.exception.InvalidArgumentException if {@code entries} or any of
+     *         its elements is null
      */
     public ConnectionMatrix(ConnectionEntry... entries) {
-        this.entries = Collections.unmodifiableList(Arrays.asList(entries));
+        this.entries = copyOf(Arrays.asList(Args.notNull(entries, "entries")));
+    }
+
+    private static List<ConnectionEntry> copyOf(List<ConnectionEntry> entries) {
+        List<ConnectionEntry> copy = new ArrayList<>(entries.size());
+        for (int i = 0; i < entries.size(); i++) {
+            copy.add(Args.notNull(entries.get(i), "entries[" + i + "]"));
+        }
+        return Collections.unmodifiableList(copy);
     }
 
     /**

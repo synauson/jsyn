@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Internal: not part of the stable jsyn API. Do not use directly from application code.
@@ -20,7 +21,7 @@ import java.nio.file.StandardCopyOption;
  */
 public final class NativeLoader {
     private static final String RESOURCE_PREFIX = "com/synauson/jsyn/natives/";
-    private static volatile String ortDylibAbsolutePath;
+    private static volatile @Nullable String ortDylibAbsolutePath;
     private static volatile boolean loaded;
 
     private NativeLoader() {}
@@ -64,8 +65,9 @@ public final class NativeLoader {
      * @throws IllegalStateException if {@link #load()} has not been called
      */
     public static String ortDylibAbsolutePath() {
-        if (!loaded) throw new IllegalStateException("NativeLoader.load() not called");
-        return ortDylibAbsolutePath;
+        String path = ortDylibAbsolutePath;
+        if (!loaded || path == null) throw new IllegalStateException("NativeLoader.load() not called");
+        return path;
     }
 
     /**

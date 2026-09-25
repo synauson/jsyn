@@ -1,13 +1,29 @@
 package com.synauson.jsyn;
 
+import com.synauson.jsyn.exception.InvalidArgumentException;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class JSynConfigTest {
     @Test
     void requiresModelsDir() {
-        // modelsDir is enforced via Objects.requireNonNull which throws NullPointerException
-        assertThrows(NullPointerException.class, () -> JSynConfig.builder().build());
+        InvalidArgumentException e = assertThrows(InvalidArgumentException.class,
+            () -> JSynConfig.builder().build());
+        assertEquals("JSynConfig requires modelsDir", e.getMessage());
+    }
+
+    @Test
+    void reportsEveryMissingField() {
+        InvalidArgumentException e = assertThrows(InvalidArgumentException.class,
+            () -> JSynConfig.builder().webrtcStunServer(null).build());
+        assertEquals("JSynConfig requires modelsDir, webrtcStunServer", e.getMessage());
+    }
+
+    @Test
+    void maxConferencesDefaultsToUnlimited() {
+        JSynConfig cfg = JSynConfig.builder().modelsDir("/models").build();
+        assertNull(cfg.maxConferences);
+        assertNull(cfg.maxParticipantsPerConference);
     }
 
     @Test

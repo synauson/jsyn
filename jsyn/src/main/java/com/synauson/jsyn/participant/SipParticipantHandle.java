@@ -1,8 +1,8 @@
 package com.synauson.jsyn.participant;
 
 import com.synauson.jsyn.SipStats;
+import com.synauson.jsyn.internal.Args;
 import com.synauson.jsyn.internal.NativeBridge;
-import java.util.Objects;
 
 /**
  * Handle to a SIP participant returned by
@@ -35,13 +35,14 @@ public final class SipParticipantHandle {
      * @param conferenceId  conference identifier; non-null
      * @param participantId participant identifier; non-null
      * @param localRtpPort  locally allocated RTP receive port for this participant
-     * @throws NullPointerException if {@code conferenceId} or {@code participantId} is null
+     * @throws com.synauson.jsyn.exception.InvalidArgumentException if {@code conferenceId} or
+     *         {@code participantId} is null
      */
     public SipParticipantHandle(long runtimeHandle, String conferenceId,
                                  String participantId, int localRtpPort) {
         this.runtimeHandle = runtimeHandle;
-        this.conferenceId = Objects.requireNonNull(conferenceId, "conferenceId");
-        this.participantId = Objects.requireNonNull(participantId, "participantId");
+        this.conferenceId = Args.notNull(conferenceId, "conferenceId");
+        this.participantId = Args.notNull(participantId, "participantId");
         this.localRtpPort = localRtpPort;
     }
 

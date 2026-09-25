@@ -9,6 +9,7 @@ import com.synauson.jsyn.event.FileEvent;
 import com.synauson.jsyn.event.IceCandidateEvent;
 import com.synauson.jsyn.event.SmartTurnEvent;
 import com.synauson.jsyn.event.VadEvent;
+import com.synauson.jsyn.internal.Args;
 import com.synauson.jsyn.internal.NativeBridge;
 import com.synauson.jsyn.internal.NativeParticipantNativeHandle;
 import com.synauson.jsyn.internal.NativeResource;
@@ -24,9 +25,8 @@ import com.synauson.jsyn.spec.WebRtcParticipantSpec;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
-import java.util.stream.Collectors;
 
 /**
  * Conference-scoped API handle.
@@ -60,12 +60,17 @@ public final class Conference extends NativeResource {
      *
      * @param runtimeHandle opaque runtime handle from {@code NativeBridge.initRuntime}
      * @param conferenceId  conference identifier; non-null
-     * @throws NullPointerException if {@code conferenceId} is null
+     * @throws com.synauson.jsyn.exception.InvalidArgumentException if {@code conferenceId} is null
      */
     public Conference(long runtimeHandle, String conferenceId) {
-        super(() -> NativeBridge.terminateConference(runtimeHandle, conferenceId));
+        super(terminator(runtimeHandle, Args.notNull(conferenceId, "conferenceId")));
         this.runtimeHandle = runtimeHandle;
-        this.conferenceId = Objects.requireNonNull(conferenceId, "conferenceId");
+        this.conferenceId = conferenceId;
+    }
+
+    // Checked before super() so a null ID never reaches the Cleaner's native call.
+    private static Runnable terminator(long runtimeHandle, String conferenceId) {
+        return () -> NativeBridge.terminateConference(runtimeHandle, conferenceId);
     }
 
     /**
@@ -109,10 +114,11 @@ public final class Conference extends NativeResource {
      * @param spec the participant configuration
      * @return a handle to the newly added participant
      * @throws com.synauson.jsyn.exception.NativeResourceClosedException if this conference is closed
+     * @throws com.synauson.jsyn.exception.InvalidArgumentException if {@code spec} is null
      */
     public FileParticipantHandle addFileParticipant(FileParticipantSpec spec) {
         requireOpen();
-        Objects.requireNonNull(spec, "spec");
+        Args.notNull(spec, "spec");
         String specJson = GSON.toJson(spec);
         String pid = NativeBridge.addFileParticipant(runtimeHandle, conferenceId, specJson);
         return new FileParticipantHandle(pid);
@@ -124,10 +130,11 @@ public final class Conference extends NativeResource {
      * @param spec the participant configuration
      * @return a handle to the newly added participant
      * @throws com.synauson.jsyn.exception.NativeResourceClosedException if this conference is closed
+     * @throws com.synauson.jsyn.exception.InvalidArgumentException if {@code spec} is null
      */
     public RecordingParticipantHandle addRecordingParticipant(RecordingParticipantSpec spec) {
         requireOpen();
-        Objects.requireNonNull(spec, "spec");
+        Args.notNull(spec, "spec");
         String specJson = GSON.toJson(spec);
         String pid = NativeBridge.addRecordingParticipant(runtimeHandle, conferenceId, specJson);
         return new RecordingParticipantHandle(pid);
@@ -142,10 +149,11 @@ public final class Conference extends NativeResource {
      * @param spec the participant configuration
      * @return a handle containing the participant ID and local RTP port
      * @throws com.synauson.jsyn.exception.NativeResourceClosedException if this conference is closed
+     * @throws com.synauson.jsyn.exception.InvalidArgumentException if {@code spec} is null
      */
     public SipParticipantHandle addSipParticipant(SipParticipantSpec spec) {
         requireOpen();
-        Objects.requireNonNull(spec, "spec");
+        Args.notNull(spec, "spec");
         String specJson = GSON.toJson(spec);
         String resultJson = NativeBridge.addSipParticipant(runtimeHandle, conferenceId, specJson);
         JsonObject result = JsonParser.parseString(resultJson).getAsJsonObject();
@@ -172,13 +180,13 @@ public final class Conference extends NativeResource {
      *         already a participant or reservation in this conference
      * @throws com.synauson.jsyn.exception.LimitExceededException if no port pair or
      *         participant slot is free
-     * @throws com.synauson.jsyn.exception.InvalidArgumentException if the SRTP key is not
-     *         30 bytes
+     * @throws com.synauson.jsyn.exception.InvalidArgumentException if {@code spec} is null or
+     *         the SRTP key is not 30 bytes
      * @since 1.2.0
      */
     public SipReservation reserveSipParticipant(SipReservationSpec spec) {
         requireOpen();
-        Objects.requireNonNull(spec, "spec");
+        Args.notNull(spec, "spec");
         String resultJson = NativeBridge.reserveSipParticipant(runtimeHandle, conferenceId,
                                                                GSON.toJson(spec));
         JsonObject result = JsonParser.parseString(resultJson).getAsJsonObject();
@@ -202,13 +210,13 @@ public final class Conference extends NativeResource {
      * @throws com.synauson.jsyn.exception.NotFoundException if no reservation has this ID
      * @throws com.synauson.jsyn.exception.AlreadyExistsException if the ID belongs to a
      *         participant that is already running
-     * @throws com.synauson.jsyn.exception.InvalidArgumentException if the remote media is
-     *         invalid or its SRTP key does not pair with the reservation's
+     * @throws com.synauson.jsyn.exception.InvalidArgumentException if {@code spec} is null, the
+     *         remote media is invalid, or its SRTP key does not pair with the reservation's
      * @since 1.2.0
      */
     public SipParticipantHandle connectSipParticipant(SipConnectionSpec spec) {
         requireOpen();
-        Objects.requireNonNull(spec, "spec");
+        Args.notNull(spec, "spec");
         String resultJson = NativeBridge.connectSipParticipant(runtimeHandle, conferenceId,
                                                                GSON.toJson(spec));
         JsonObject result = JsonParser.parseString(resultJson).getAsJsonObject();
@@ -228,10 +236,11 @@ public final class Conference extends NativeResource {
      * @param spec the participant configuration (must include the browser's SDP offer)
      * @return a handle containing the participant ID and the generated SDP answer
      * @throws com.synauson.jsyn.exception.NativeResourceClosedException if this conference is closed
+     * @throws com.synauson.jsyn.exception.InvalidArgumentException if {@code spec} is null
      */
     public WebRtcParticipantHandle addWebRtcParticipant(WebRtcParticipantSpec spec) {
         requireOpen();
-        Objects.requireNonNull(spec, "spec");
+        Args.notNull(spec, "spec");
         String specJson = GSON.toJson(spec);
         String resultJson = NativeBridge.addWebRtcParticipant(runtimeHandle, conferenceId, specJson);
         JsonObject result = JsonParser.parseString(resultJson).getAsJsonObject();
@@ -247,11 +256,13 @@ public final class Conference extends NativeResource {
      * @param spec          the participant configuration
      * @return a handle with direct ring-buffer I/O
      * @throws com.synauson.jsyn.exception.NativeResourceClosedException if this conference is closed
+     * @throws com.synauson.jsyn.exception.InvalidArgumentException if
+     *         {@code participantId} or {@code spec} is null
      */
     public NativeParticipant addNativeParticipant(String participantId, NativeParticipantSpec spec) {
         requireOpen();
-        Objects.requireNonNull(participantId, "participantId");
-        Objects.requireNonNull(spec, "spec");
+        Args.notNull(participantId, "participantId");
+        Args.notNull(spec, "spec");
         String specJson = GSON.toJson(spec);
         NativeParticipantNativeHandle nativeHandle =
             NativeBridge.addNativeParticipant(runtimeHandle, conferenceId, participantId, specJson);
@@ -264,9 +275,12 @@ public final class Conference extends NativeResource {
      *
      * @param participantId the ID of the participant to remove
      * @throws com.synauson.jsyn.exception.NativeResourceClosedException if this conference is closed
+     * @throws com.synauson.jsyn.exception.InvalidArgumentException if
+     *         {@code participantId} is null
      */
     public void removeParticipant(String participantId) {
         requireOpen();
+        Args.notNull(participantId, "participantId");
         NativeBridge.removeParticipant(runtimeHandle, conferenceId, participantId);
     }
 
@@ -280,9 +294,12 @@ public final class Conference extends NativeResource {
      * @param participantId the participant to mute/unmute
      * @param muted         {@code true} to mute, {@code false} to unmute
      * @throws com.synauson.jsyn.exception.NativeResourceClosedException if this conference is closed
+     * @throws com.synauson.jsyn.exception.InvalidArgumentException if
+     *         {@code participantId} is null
      */
     public void muteParticipant(String participantId, boolean muted) {
         requireOpen();
+        Args.notNull(participantId, "participantId");
         NativeBridge.muteParticipant(runtimeHandle, conferenceId, participantId, muted);
     }
 
@@ -294,10 +311,11 @@ public final class Conference extends NativeResource {
      *
      * @param matrix the desired audio connection topology
      * @throws com.synauson.jsyn.exception.NativeResourceClosedException if this conference is closed
+     * @throws com.synauson.jsyn.exception.InvalidArgumentException if {@code matrix} is null
      */
     public void updatePartyAudioConnections(ConnectionMatrix matrix) {
         requireOpen();
-        Objects.requireNonNull(matrix, "matrix");
+        Args.notNull(matrix, "matrix");
         String matrixJson = GSON.toJson(matrix);
         NativeBridge.updatePartyAudioConnections(runtimeHandle, conferenceId, matrixJson);
     }
@@ -311,12 +329,18 @@ public final class Conference extends NativeResource {
      * @param participantId the file participant to inject audio into
      * @param files         ordered list of audio files to play
      * @throws com.synauson.jsyn.exception.NativeResourceClosedException if this conference is closed
+     * @throws com.synauson.jsyn.exception.InvalidArgumentException if
+     *         {@code participantId}, {@code files}, or any element of {@code files} is null
      */
     public void addPriorityAudioFiles(String participantId, List<PriorityFile> files) {
         requireOpen();
-        Objects.requireNonNull(files, "files");
+        Args.notNull(participantId, "participantId");
+        Args.notNull(files, "files");
         // Serialize as {"uris": ["...", ...]} matching PriorityAudioFilesJson in Rust.
-        List<String> uris = files.stream().map(f -> f.uri).collect(Collectors.toList());
+        List<String> uris = new ArrayList<>(files.size());
+        for (int i = 0; i < files.size(); i++) {
+            uris.add(Args.notNull(files.get(i), "files[" + i + "]").uri);
+        }
         JsonObject obj = new JsonObject();
         obj.add("uris", GSON.toJsonTree(uris));
         NativeBridge.addPriorityAudioFiles(runtimeHandle, conferenceId, participantId,
@@ -334,11 +358,15 @@ public final class Conference extends NativeResource {
      * @param observer      receives {@link VadEvent.SpeechStart} and {@link VadEvent.SpeechEnd}
      * @return a {@link Subscription} that cancels the stream when {@link Subscription#close()} is called
      * @throws com.synauson.jsyn.exception.NativeResourceClosedException if this conference is closed
+     * @throws com.synauson.jsyn.exception.InvalidArgumentException if
+     *         {@code participantId} or {@code observer} is null
      */
     @SuppressWarnings("unchecked")
     public Subscription streamVadEvents(String participantId,
                                          EventStreamObserver<VadEvent> observer) {
         requireOpen();
+        Args.notNull(participantId, "participantId");
+        Args.notNull(observer, "observer");
         long subId = NativeBridge.subscribeVadEvents(runtimeHandle, conferenceId,
                                                       participantId, (EventStreamObserver<?>) observer);
         return new Subscription(subId);
@@ -351,11 +379,15 @@ public final class Conference extends NativeResource {
      * @param observer      receives {@link SmartTurnEvent.TurnResult}
      * @return a {@link Subscription} that cancels the stream when {@link Subscription#close()} is called
      * @throws com.synauson.jsyn.exception.NativeResourceClosedException if this conference is closed
+     * @throws com.synauson.jsyn.exception.InvalidArgumentException if
+     *         {@code participantId} or {@code observer} is null
      */
     @SuppressWarnings("unchecked")
     public Subscription streamSmartTurnEvents(String participantId,
                                                EventStreamObserver<SmartTurnEvent> observer) {
         requireOpen();
+        Args.notNull(participantId, "participantId");
+        Args.notNull(observer, "observer");
         long subId = NativeBridge.subscribeSmartTurnEvents(runtimeHandle, conferenceId,
                                                             participantId, (EventStreamObserver<?>) observer);
         return new Subscription(subId);
@@ -368,11 +400,15 @@ public final class Conference extends NativeResource {
      * @param observer      receives {@link FileEvent} subtypes
      * @return a {@link Subscription} that cancels the stream when {@link Subscription#close()} is called
      * @throws com.synauson.jsyn.exception.NativeResourceClosedException if this conference is closed
+     * @throws com.synauson.jsyn.exception.InvalidArgumentException if
+     *         {@code participantId} or {@code observer} is null
      */
     @SuppressWarnings("unchecked")
     public Subscription streamFileEvents(String participantId,
                                           EventStreamObserver<FileEvent> observer) {
         requireOpen();
+        Args.notNull(participantId, "participantId");
+        Args.notNull(observer, "observer");
         long subId = NativeBridge.subscribeFileEvents(runtimeHandle, conferenceId,
                                                        participantId, (EventStreamObserver<?>) observer);
         return new Subscription(subId);
@@ -385,11 +421,15 @@ public final class Conference extends NativeResource {
      * @param observer      receives {@link DtmfEvent}
      * @return a {@link Subscription} that cancels the stream when {@link Subscription#close()} is called
      * @throws com.synauson.jsyn.exception.NativeResourceClosedException if this conference is closed
+     * @throws com.synauson.jsyn.exception.InvalidArgumentException if
+     *         {@code participantId} or {@code observer} is null
      */
     @SuppressWarnings("unchecked")
     public Subscription streamDtmfEvents(String participantId,
                                           EventStreamObserver<DtmfEvent> observer) {
         requireOpen();
+        Args.notNull(participantId, "participantId");
+        Args.notNull(observer, "observer");
         long subId = NativeBridge.subscribeDtmfEvents(runtimeHandle, conferenceId,
                                                        participantId, (EventStreamObserver<?>) observer);
         return new Subscription(subId);
@@ -404,11 +444,15 @@ public final class Conference extends NativeResource {
      * @param observer      receives {@link IceCandidateEvent}
      * @return a {@link Subscription} that cancels the stream when {@link Subscription#close()} is called
      * @throws com.synauson.jsyn.exception.NativeResourceClosedException if this conference is closed
+     * @throws com.synauson.jsyn.exception.InvalidArgumentException if
+     *         {@code participantId} or {@code observer} is null
      */
     @SuppressWarnings("unchecked")
     public Subscription streamWebRtcIceCandidates(String participantId,
                                                     EventStreamObserver<IceCandidateEvent> observer) {
         requireOpen();
+        Args.notNull(participantId, "participantId");
+        Args.notNull(observer, "observer");
         long subId = NativeBridge.subscribeWebRtcIceCandidates(runtimeHandle, conferenceId,
                                                                  participantId, (EventStreamObserver<?>) observer);
         return new Subscription(subId);

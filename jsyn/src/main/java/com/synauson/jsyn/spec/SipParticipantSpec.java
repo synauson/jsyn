@@ -1,6 +1,7 @@
 package com.synauson.jsyn.spec;
 
-import java.util.Objects;
+import com.synauson.jsyn.internal.Args;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Spec for adding a SIP participant.
@@ -32,19 +33,19 @@ public final class SipParticipantSpec {
     public final int dtmfPayloadType;
 
     /** Optional SRTP configuration; {@code null} = plaintext RTP. */
-    public final SrtpConfig srtp;
+    public final @Nullable SrtpConfig srtp;
 
     /** Optional VAD configuration; {@code null} disables VAD detection. */
-    public final VadConfig vad;
+    public final @Nullable VadConfig vad;
 
     /** Optional SmartTurn configuration; {@code null} disables SmartTurn detection. */
-    public final SmartTurnConfig smartTurn;
+    public final @Nullable SmartTurnConfig smartTurn;
 
     private SipParticipantSpec(Builder b) {
-        this.participantId = Objects.requireNonNull(b.participantId, "participantId");
-        this.remoteIp = Objects.requireNonNull(b.remoteIp, "remoteIp");
+        this.participantId = Args.notNull(b.participantId, "participantId");
+        this.remoteIp = Args.notNull(b.remoteIp, "remoteIp");
         this.remoteRtpPort = b.remoteRtpPort;
-        this.codec = Objects.requireNonNull(b.codec, "codec");
+        this.codec = Args.notNull(b.codec, "codec");
         this.dtmfPayloadType = b.dtmfPayloadType;
         this.srtp = b.srtp;
         this.vad = b.vad;
@@ -65,14 +66,14 @@ public final class SipParticipantSpec {
      * @since 0.1.0
      */
     public static final class Builder {
-        private String participantId;
-        private String remoteIp;
+        private @Nullable String participantId;
+        private @Nullable String remoteIp;
         private int remoteRtpPort;
-        private String codec;
+        private @Nullable String codec;
         private int dtmfPayloadType;
-        private SrtpConfig srtp;
-        private VadConfig vad;
-        private SmartTurnConfig smartTurn;
+        private @Nullable SrtpConfig srtp;
+        private @Nullable VadConfig vad;
+        private @Nullable SmartTurnConfig smartTurn;
 
         /**
          * Set the participant ID. Required.
@@ -120,7 +121,7 @@ public final class SipParticipantSpec {
          * @param srtp SRTP key material, or {@code null} for plaintext RTP
          * @return this builder
          */
-        public Builder srtp(SrtpConfig srtp) { this.srtp = srtp; return this; }
+        public Builder srtp(@Nullable SrtpConfig srtp) { this.srtp = srtp; return this; }
 
         /**
          * Enable VAD detection on this participant's audio stream.
@@ -128,7 +129,7 @@ public final class SipParticipantSpec {
          * @param vad VAD configuration, or {@code null} to disable
          * @return this builder
          */
-        public Builder vad(VadConfig vad) { this.vad = vad; return this; }
+        public Builder vad(@Nullable VadConfig vad) { this.vad = vad; return this; }
 
         /**
          * Enable SmartTurn detection on this participant's audio stream.
@@ -136,14 +137,22 @@ public final class SipParticipantSpec {
          * @param st SmartTurn configuration, or {@code null} to disable
          * @return this builder
          */
-        public Builder smartTurn(SmartTurnConfig st) { this.smartTurn = st; return this; }
+        public Builder smartTurn(@Nullable SmartTurnConfig st) { this.smartTurn = st; return this; }
 
         /**
          * Materialise an immutable {@link SipParticipantSpec}.
          *
          * @return the configured spec
-         * @throws NullPointerException if any required field is null
+         * @throws com.synauson.jsyn.exception.InvalidArgumentException naming every required
+         *         field that is missing
          */
-        public SipParticipantSpec build() { return new SipParticipantSpec(this); }
+        public SipParticipantSpec build() {
+            Args.required("SipParticipantSpec")
+                .field("participantId", participantId)
+                .field("remoteIp", remoteIp)
+                .field("codec", codec)
+                .validate();
+            return new SipParticipantSpec(this);
+        }
     }
 }

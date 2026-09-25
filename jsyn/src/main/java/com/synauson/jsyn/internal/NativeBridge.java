@@ -1,6 +1,7 @@
 package com.synauson.jsyn.internal;
 
 import com.synauson.jsyn.EventStreamObserver;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Internal: not part of the stable jsyn API. Do not use directly from application code.
@@ -50,7 +51,7 @@ public final class NativeBridge {
      *
      * @return {@code null} on success or an error string identifying the missing element
      */
-    public static native String gstreamerSanityCheck();
+    public static native @Nullable String gstreamerSanityCheck();
 
     /**
      * Capture a JSON resource snapshot (memory, CPU, conferences).

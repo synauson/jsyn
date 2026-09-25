@@ -1,6 +1,7 @@
 package com.synauson.jsyn.spec;
 
-import java.util.Objects;
+import com.synauson.jsyn.internal.Args;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The media a SIP peer negotiated in its SDP: where it receives RTP, the codec and DTMF
@@ -29,12 +30,12 @@ public final class SipRemoteMedia {
      * The peer's 30-byte SRTP master key from its {@code a=crypto} line, which decrypts what it
      * sends. Set exactly when the reservation carried our key.
      */
-    public final byte[] srtpKey;
+    public final byte @Nullable [] srtpKey;
 
     private SipRemoteMedia(Builder b) {
-        this.remoteIp = Objects.requireNonNull(b.remoteIp, "remoteIp");
+        this.remoteIp = Args.notNull(b.remoteIp, "remoteIp");
         this.remoteRtpPort = b.remoteRtpPort;
-        this.codec = Objects.requireNonNull(b.codec, "codec");
+        this.codec = Args.notNull(b.codec, "codec");
         this.dtmfPayloadType = b.dtmfPayloadType;
         this.srtpKey = b.srtpKey == null ? null : b.srtpKey.clone();
     }
@@ -53,11 +54,11 @@ public final class SipRemoteMedia {
      * @since 1.2.0
      */
     public static final class Builder {
-        private String remoteIp;
+        private @Nullable String remoteIp;
         private int remoteRtpPort;
-        private String codec;
+        private @Nullable String codec;
         private int dtmfPayloadType;
-        private byte[] srtpKey;
+        private byte @Nullable [] srtpKey;
 
         /**
          * Set the peer's RTP address. Required.
@@ -97,14 +98,21 @@ public final class SipRemoteMedia {
          * @param key the peer's 30-byte SRTP master key, or {@code null} for plain RTP
          * @return this builder
          */
-        public Builder srtpKey(byte[] key) { this.srtpKey = key; return this; }
+        public Builder srtpKey(byte @Nullable [] key) { this.srtpKey = key; return this; }
 
         /**
          * Materialise an immutable {@link SipRemoteMedia}.
          *
          * @return the configured remote media
-         * @throws NullPointerException if {@code remoteIp} or {@code codec} is null
+         * @throws com.synauson.jsyn.exception.InvalidArgumentException naming every required
+         *         field that is missing
          */
-        public SipRemoteMedia build() { return new SipRemoteMedia(this); }
+        public SipRemoteMedia build() {
+            Args.required("SipRemoteMedia")
+                .field("remoteIp", remoteIp)
+                .field("codec", codec)
+                .validate();
+            return new SipRemoteMedia(this);
+        }
     }
 }

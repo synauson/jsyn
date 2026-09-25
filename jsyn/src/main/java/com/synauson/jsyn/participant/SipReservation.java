@@ -1,6 +1,6 @@
 package com.synauson.jsyn.participant;
 
-import java.util.Objects;
+import com.synauson.jsyn.internal.Args;
 
 /**
  * A SIP participant's local RTP/RTCP ports, reserved by
@@ -29,7 +29,7 @@ public final class SipReservation {
      * @param localRtcpPort the reserved RTCP port
      */
     public SipReservation(String participantId, int localRtpPort, int localRtcpPort) {
-        this.participantId = Objects.requireNonNull(participantId, "participantId");
+        this.participantId = Args.notNull(participantId, "participantId");
         this.localRtpPort = localRtpPort;
         this.localRtcpPort = localRtcpPort;
     }

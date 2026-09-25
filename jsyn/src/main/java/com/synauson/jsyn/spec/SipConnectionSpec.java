@@ -1,6 +1,7 @@
 package com.synauson.jsyn.spec;
 
-import java.util.Objects;
+import com.synauson.jsyn.internal.Args;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Spec for connecting a SIP participant reserved with
@@ -21,14 +22,14 @@ public final class SipConnectionSpec {
     public final SipRemoteMedia remote;
 
     /** Optional VAD configuration; {@code null} disables VAD detection. */
-    public final VadConfig vad;
+    public final @Nullable VadConfig vad;
 
     /** Optional SmartTurn configuration; {@code null} disables SmartTurn detection. */
-    public final SmartTurnConfig smartTurn;
+    public final @Nullable SmartTurnConfig smartTurn;
 
     private SipConnectionSpec(Builder b) {
-        this.participantId = Objects.requireNonNull(b.participantId, "participantId");
-        this.remote = Objects.requireNonNull(b.remote, "remote");
+        this.participantId = Args.notNull(b.participantId, "participantId");
+        this.remote = Args.notNull(b.remote, "remote");
         this.vad = b.vad;
         this.smartTurn = b.smartTurn;
     }
@@ -47,10 +48,10 @@ public final class SipConnectionSpec {
      * @since 1.2.0
      */
     public static final class Builder {
-        private String participantId;
-        private SipRemoteMedia remote;
-        private VadConfig vad;
-        private SmartTurnConfig smartTurn;
+        private @Nullable String participantId;
+        private @Nullable SipRemoteMedia remote;
+        private @Nullable VadConfig vad;
+        private @Nullable SmartTurnConfig smartTurn;
 
         /**
          * Set the reserved participant's ID. Required.
@@ -74,7 +75,7 @@ public final class SipConnectionSpec {
          * @param vad VAD configuration, or {@code null} to disable
          * @return this builder
          */
-        public Builder vad(VadConfig vad) { this.vad = vad; return this; }
+        public Builder vad(@Nullable VadConfig vad) { this.vad = vad; return this; }
 
         /**
          * Enable SmartTurn detection on this participant's audio stream.
@@ -82,14 +83,21 @@ public final class SipConnectionSpec {
          * @param st SmartTurn configuration, or {@code null} to disable
          * @return this builder
          */
-        public Builder smartTurn(SmartTurnConfig st) { this.smartTurn = st; return this; }
+        public Builder smartTurn(@Nullable SmartTurnConfig st) { this.smartTurn = st; return this; }
 
         /**
          * Materialise an immutable {@link SipConnectionSpec}.
          *
          * @return the configured spec
-         * @throws NullPointerException if {@code participantId} or {@code remote} is null
+         * @throws com.synauson.jsyn.exception.InvalidArgumentException naming every required
+         *         field that is missing
          */
-        public SipConnectionSpec build() { return new SipConnectionSpec(this); }
+        public SipConnectionSpec build() {
+            Args.required("SipConnectionSpec")
+                .field("participantId", participantId)
+                .field("remote", remote)
+                .validate();
+            return new SipConnectionSpec(this);
+        }
     }
 }

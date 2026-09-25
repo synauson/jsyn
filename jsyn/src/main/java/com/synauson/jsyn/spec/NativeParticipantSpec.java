@@ -1,8 +1,9 @@
 package com.synauson.jsyn.spec;
 
 import com.synauson.jsyn.NativeAudioFormat;
+import com.synauson.jsyn.internal.Args;
 import com.google.gson.annotations.SerializedName;
-import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Spec for adding a native (in-process) participant.
@@ -21,14 +22,14 @@ public final class NativeParticipantSpec {
     public final NativeAudioFormat format;
 
     /** Optional VAD configuration; {@code null} disables VAD detection. */
-    public final VadConfig vad;
+    public final @Nullable VadConfig vad;
 
     /** Optional SmartTurn configuration; {@code null} disables SmartTurn detection. */
     @SerializedName("smart_turn")
-    public final SmartTurnConfig smartTurn;
+    public final @Nullable SmartTurnConfig smartTurn;
 
     private NativeParticipantSpec(Builder b) {
-        this.format = Objects.requireNonNull(b.format, "format");
+        this.format = Args.notNull(b.format, "format");
         this.vad = b.vad;
         this.smartTurn = b.smartTurn;
     }
@@ -46,9 +47,9 @@ public final class NativeParticipantSpec {
      * @since 0.1.0
      */
     public static final class Builder {
-        private NativeAudioFormat format;
-        private VadConfig vad;
-        private SmartTurnConfig smartTurn;
+        private @Nullable NativeAudioFormat format;
+        private @Nullable VadConfig vad;
+        private @Nullable SmartTurnConfig smartTurn;
 
         /**
          * Set the audio format. Required.
@@ -64,7 +65,7 @@ public final class NativeParticipantSpec {
          * @param vad VAD configuration, or {@code null} to disable
          * @return this builder
          */
-        public Builder vad(VadConfig vad) { this.vad = vad; return this; }
+        public Builder vad(@Nullable VadConfig vad) { this.vad = vad; return this; }
 
         /**
          * Enable SmartTurn detection on the participant's audio stream.
@@ -72,14 +73,20 @@ public final class NativeParticipantSpec {
          * @param st SmartTurn configuration, or {@code null} to disable
          * @return this builder
          */
-        public Builder smartTurn(SmartTurnConfig st) { this.smartTurn = st; return this; }
+        public Builder smartTurn(@Nullable SmartTurnConfig st) { this.smartTurn = st; return this; }
 
         /**
          * Materialise an immutable {@link NativeParticipantSpec}.
          *
          * @return the configured spec
-         * @throws NullPointerException if {@code format} is null
+         * @throws com.synauson.jsyn.exception.InvalidArgumentException naming every required
+         *         field that is missing
          */
-        public NativeParticipantSpec build() { return new NativeParticipantSpec(this); }
+        public NativeParticipantSpec build() {
+            Args.required("NativeParticipantSpec")
+                .field("format", format)
+                .validate();
+            return new NativeParticipantSpec(this);
+        }
     }
 }

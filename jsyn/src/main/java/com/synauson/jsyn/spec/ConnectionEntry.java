@@ -1,7 +1,7 @@
 package com.synauson.jsyn.spec;
 
+import com.synauson.jsyn.internal.Args;
 import com.google.gson.annotations.SerializedName;
-import java.util.Objects;
 
 /**
  * A single directed audio connection entry in a {@link ConnectionMatrix}.
@@ -34,8 +34,8 @@ public final class ConnectionEntry {
      * @param muted    {@code true} if the connection is initially muted
      */
     public ConnectionEntry(String sourceId, String destId, boolean muted) {
-        this.sourceId = Objects.requireNonNull(sourceId, "sourceId");
-        this.destId = Objects.requireNonNull(destId, "destId");
+        this.sourceId = Args.notNull(sourceId, "sourceId");
+        this.destId = Args.notNull(destId, "destId");
         this.muted = muted;
     }
 

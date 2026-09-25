@@ -1,7 +1,8 @@
 package com.synauson.jsyn.spec;
 
+import com.synauson.jsyn.internal.Args;
 import com.google.gson.annotations.SerializedName;
-import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Spec for adding a recording participant.
@@ -30,9 +31,9 @@ public final class RecordingParticipantSpec {
     public final String outputPath;
 
     private RecordingParticipantSpec(Builder b) {
-        this.id = Objects.requireNonNull(b.id, "id");
-        this.sourceParticipantId = Objects.requireNonNull(b.sourceParticipantId, "sourceParticipantId");
-        this.outputPath = Objects.requireNonNull(b.outputPath, "outputPath");
+        this.id = Args.notNull(b.id, "id");
+        this.sourceParticipantId = Args.notNull(b.sourceParticipantId, "sourceParticipantId");
+        this.outputPath = Args.notNull(b.outputPath, "outputPath");
     }
 
     /**
@@ -48,9 +49,9 @@ public final class RecordingParticipantSpec {
      * @since 0.1.0
      */
     public static final class Builder {
-        private String id;
-        private String sourceParticipantId;
-        private String outputPath;
+        private @Nullable String id;
+        private @Nullable String sourceParticipantId;
+        private @Nullable String outputPath;
 
         /**
          * Set the recorder's participant ID. Required.
@@ -80,8 +81,16 @@ public final class RecordingParticipantSpec {
          * Materialise an immutable {@link RecordingParticipantSpec}.
          *
          * @return the configured spec
-         * @throws NullPointerException if any required field is null
+         * @throws com.synauson.jsyn.exception.InvalidArgumentException naming every required
+         *         field that is missing
          */
-        public RecordingParticipantSpec build() { return new RecordingParticipantSpec(this); }
+        public RecordingParticipantSpec build() {
+            Args.required("RecordingParticipantSpec")
+                .field("id", id)
+                .field("sourceParticipantId", sourceParticipantId)
+                .field("outputPath", outputPath)
+                .validate();
+            return new RecordingParticipantSpec(this);
+        }
     }
 }

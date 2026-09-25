@@ -1,5 +1,10 @@
 dependencies {
     api("com.google.code.gson:gson:2.11.0")
+    // JSpecify nullness annotations (@NullMarked, @Nullable) on the public API.
+    // Annotation-only, no runtime behaviour. `api` rather than compileOnly: the
+    // annotations appear in public signatures, and JSpecify asks that consumers
+    // get them transitively so NullAway, Kotlin and IDEs can read them.
+    api("org.jspecify:jspecify:1.0.0")
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.3")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testImplementation("com.microsoft.playwright:playwright:1.47.0")
