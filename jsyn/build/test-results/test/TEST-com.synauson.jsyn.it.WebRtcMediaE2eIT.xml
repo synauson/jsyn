@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.synauson.jsyn.it.WebRtcMediaE2eIT" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-09-25T04:55:38" hostname="vm" time="13.696">
+  <properties/>
+  <testcase name="realSpeechThroughWebRtcTriggersVad()" classname="com.synauson.jsyn.it.WebRtcMediaE2eIT" time="3.033"/>
+  <testcase name="audioFlowsBackToTheBrowser()" classname="com.synauson.jsyn.it.WebRtcMediaE2eIT" time="10.663"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
