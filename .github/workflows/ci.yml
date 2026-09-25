@@ -187,6 +187,20 @@ jobs:
           }
           "C:\gstreamer\1.0\msvc_x86_64\bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
 
+      # The first gst_init() for a user scans every installed plugin through
+      # gst-plugin-scanner and caches the result under %LOCALAPPDATA%\gstreamer-1.0
+      # (ensure_current_registry in gstreamer/gst/gstregistry.c). On a fresh
+      # runner that takes 7-44 s (DirectShow, Media Foundation and D3D11
+      # plugins probe devices at load), and without this step it lands inside
+      # whichever IT constructs JSyn first and blows its @Timeout.
+      - name: Build GStreamer plugin registry
+        shell: pwsh
+        run: |
+          $sw = [Diagnostics.Stopwatch]::StartNew()
+          gst-inspect-1.0.exe coreelements | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "gst-inspect-1.0 failed: $LASTEXITCODE" }
+          Write-Host "GStreamer registry built in $($sw.Elapsed.TotalSeconds) s"
+
       - name: Download + extract ONNX Runtime (cache miss only)
         if: steps.cache-deps.outputs.cache-hit != 'true'
         shell: pwsh
