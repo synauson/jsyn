@@ -119,6 +119,13 @@ jobs:
           ./gradlew :jsyn:test --no-daemon --console=plain \
             -DsynausonRepoDir="${{ github.workspace }}/synauson-repo"
 
+      # Artifacts are awkward to fetch from automation; put the failing
+      # classes' JUnit XML (stack traces, suppressed exceptions, captured
+      # stdout/stderr) straight into the job log.
+      - name: Print failing test reports
+        if: failure()
+        run: grep -l -E '<(failure|error) ' jsyn/build/test-results/test/*.xml | xargs -r cat
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
@@ -236,6 +243,15 @@ jobs:
         run: |
           ./gradlew.bat :jsyn:test --no-daemon --console=plain `
             "-DsynausonRepoDir=${{ github.workspace }}\synauson-repo"
+
+      # See the matching step in test-linux.
+      - name: Print failing test reports
+        if: failure()
+        shell: pwsh
+        run: |
+          Get-ChildItem jsyn/build/test-results/test/*.xml |
+            Where-Object { Select-String -Path $_ -Pattern '<(failure|error) ' -Quiet } |
+            ForEach-Object { Get-Content $_ }
 
       - name: Upload test results
         if: always()
