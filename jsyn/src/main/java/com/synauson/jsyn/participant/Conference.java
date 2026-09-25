@@ -17,7 +17,9 @@ import com.synauson.jsyn.spec.FileParticipantSpec;
 import com.synauson.jsyn.spec.NativeParticipantSpec;
 import com.synauson.jsyn.spec.PriorityFile;
 import com.synauson.jsyn.spec.RecordingParticipantSpec;
+import com.synauson.jsyn.spec.SipConnectionSpec;
 import com.synauson.jsyn.spec.SipParticipantSpec;
+import com.synauson.jsyn.spec.SipReservationSpec;
 import com.synauson.jsyn.spec.WebRtcParticipantSpec;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
@@ -153,6 +155,69 @@ public final class Conference extends NativeResource {
     }
 
     /**
+     * Reserve a SIP participant's local RTP/RTCP ports for an outbound call, before the peer's
+     * media is known.
+     *
+     * <p>Put {@link SipReservation#localRtpPort()} in the SDP offer, then call
+     * {@link #connectSipParticipant} with the media from the peer's answer. Both sockets are
+     * bound when this returns, so media the peer sends early is kept, but nothing runs until
+     * the connect. Use {@link #addSipParticipant} instead when the peer's media is already
+     * known (an inbound call). Release an unconnected reservation with
+     * {@link #removeParticipant(String)}.
+     *
+     * @param spec the reservation configuration
+     * @return the reserved ports
+     * @throws com.synauson.jsyn.exception.NativeResourceClosedException if this conference is closed
+     * @throws com.synauson.jsyn.exception.AlreadyExistsException if the participant ID is
+     *         already a participant or reservation in this conference
+     * @throws com.synauson.jsyn.exception.LimitExceededException if no port pair or
+     *         participant slot is free
+     * @throws com.synauson.jsyn.exception.InvalidArgumentException if the SRTP key is not
+     *         30 bytes
+     * @since 1.2.0
+     */
+    public SipReservation reserveSipParticipant(SipReservationSpec spec) {
+        requireOpen();
+        Objects.requireNonNull(spec, "spec");
+        String resultJson = NativeBridge.reserveSipParticipant(runtimeHandle, conferenceId,
+                                                               GSON.toJson(spec));
+        JsonObject result = JsonParser.parseString(resultJson).getAsJsonObject();
+        return new SipReservation(result.get("participantId").getAsString(),
+                                  result.get("localRtpPort").getAsInt(),
+                                  result.get("localRtcpPort").getAsInt());
+    }
+
+    /**
+     * Start a SIP participant reserved with {@link #reserveSipParticipant} on its reserved
+     * ports, once the peer's SDP answer is in. The participant sends from the port it receives
+     * on (symmetric RTP).
+     *
+     * <p>Invalid arguments, such as an SRTP key on one side only, leave the reservation in
+     * place so the call can be retried. Any later failure releases it, and the participant
+     * must be reserved again.
+     *
+     * @param spec the reserved participant's ID and the peer's negotiated media
+     * @return a handle to the running participant, carrying the reserved RTP port
+     * @throws com.synauson.jsyn.exception.NativeResourceClosedException if this conference is closed
+     * @throws com.synauson.jsyn.exception.NotFoundException if no reservation has this ID
+     * @throws com.synauson.jsyn.exception.AlreadyExistsException if the ID belongs to a
+     *         participant that is already running
+     * @throws com.synauson.jsyn.exception.InvalidArgumentException if the remote media is
+     *         invalid or its SRTP key does not pair with the reservation's
+     * @since 1.2.0
+     */
+    public SipParticipantHandle connectSipParticipant(SipConnectionSpec spec) {
+        requireOpen();
+        Objects.requireNonNull(spec, "spec");
+        String resultJson = NativeBridge.connectSipParticipant(runtimeHandle, conferenceId,
+                                                               GSON.toJson(spec));
+        JsonObject result = JsonParser.parseString(resultJson).getAsJsonObject();
+        String pid = result.get("participantId").getAsString();
+        int localRtpPort = result.get("localRtpPort").getAsInt();
+        return new SipParticipantHandle(runtimeHandle, conferenceId, pid, localRtpPort);
+    }
+
+    /**
      * Add a WebRTC participant to this conference.
      *
      * <p>The call blocks until the GStreamer webrtcbin processes the SDP offer and
@@ -194,7 +259,8 @@ public final class Conference extends NativeResource {
     }
 
     /**
-     * Remove a participant from this conference.
+     * Remove a participant from this conference, or release an unconnected
+     * {@link SipReservation} and its ports.
      *
      * @param participantId the ID of the participant to remove
      * @throws com.synauson.jsyn.exception.NativeResourceClosedException if this conference is closed

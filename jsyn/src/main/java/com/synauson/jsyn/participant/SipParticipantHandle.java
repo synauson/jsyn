@@ -6,11 +6,14 @@ import java.util.Objects;
 
 /**
  * Handle to a SIP participant returned by
- * {@link com.synauson.jsyn.participant.Conference#addSipParticipant}.
+ * {@link com.synauson.jsyn.participant.Conference#addSipParticipant} or
+ * {@link com.synauson.jsyn.participant.Conference#connectSipParticipant}.
  *
  * <p>Carries the participant ID and the locally allocated RTP port number that was
- * negotiated during participant construction. Use {@link #localRtpPort()} to relay this
- * port back to the SIP signaling layer for the remote peer's SDP answer.
+ * negotiated during participant construction. For a participant from
+ * {@code addSipParticipant}, relay {@link #localRtpPort()} back to the SIP signaling layer
+ * for the SDP answer; for one from {@code connectSipParticipant} it is the port the
+ * {@link SipReservation} already put in the offer.
  *
  * <p>Provides DTMF send via {@link #sendDtmf(char, int)} and live quality statistics
  * via {@link #stats()}.
