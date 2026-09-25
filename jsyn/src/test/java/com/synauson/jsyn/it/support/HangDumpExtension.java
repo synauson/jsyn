@@ -83,21 +83,33 @@ public final class HangDumpExtension implements BeforeTestExecutionCallback, Aft
         }
         String cdb = System.getProperty("jsyn.cdb");
         if (cdb != null && Files.isRegularFile(Path.of(cdb))) {
-            Path out = dir.resolve(base + "-native.txt").toAbsolutePath();
-            // -pv: noninvasive attach (threads are suspended while cdb reads them,
-            // then resumed on detach). ~*kn: every thread's native stack.
-            ProcessBuilder pb = new ProcessBuilder(cdb, "-pv", "-p", Long.toString(ProcessHandle.current().pid()),
-                    "-y", "srv*C:\\symcache*https://msdl.microsoft.com/download/symbols",
-                    "-c", ".reload; ~*kn 80; qd")
-                    .redirectErrorStream(true)
-                    .redirectOutput(out.toFile());
-            try {
-                Process p = pb.start();
-                if (!p.waitFor(180, TimeUnit.SECONDS)) p.destroyForcibly();
-                System.err.println("native stacks written to " + out);
-            } catch (Exception e) {
-                System.err.println("cdb failed: " + e);
-            }
+            // This JVM plus its children (gst-plugin-scanner runs as a child
+            // process while the registry is being built).
+            nativeStacks(cdb, ProcessHandle.current().pid(), dir.resolve(base + "-native.txt"));
+            ProcessHandle.current().descendants().forEach(ph -> {
+                String cmd = ph.info().command().orElse("?");
+                System.err.println("child pid " + ph.pid() + " " + cmd);
+                if (!cmd.toLowerCase().contains("cdb")) {
+                    nativeStacks(cdb, ph.pid(), dir.resolve(base + "-child-" + ph.pid() + "-native.txt"));
+                }
+            });
+        }
+    }
+
+    private static void nativeStacks(String cdb, long pid, Path out) {
+        // -pv: noninvasive attach (threads are suspended while cdb reads them,
+        // then resumed on detach). ~*kn: every thread's native stack.
+        ProcessBuilder pb = new ProcessBuilder(cdb, "-pv", "-p", Long.toString(pid),
+                "-y", "srv*C:\\symcache*https://msdl.microsoft.com/download/symbols",
+                "-c", ".reload; |; ~*kn 80; qd")
+                .redirectErrorStream(true)
+                .redirectOutput(out.toAbsolutePath().toFile());
+        try {
+            Process p = pb.start();
+            if (!p.waitFor(180, TimeUnit.SECONDS)) p.destroyForcibly();
+            System.err.println("native stacks written to " + out.toAbsolutePath());
+        } catch (Exception e) {
+            System.err.println("cdb failed: " + e);
         }
     }
 }

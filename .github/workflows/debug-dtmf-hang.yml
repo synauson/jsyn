@@ -12,7 +12,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        mode: [warm]
         shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+        include:
+          - { mode: cold, shard: 101 }
+          - { mode: cold, shard: 102 }
+          - { mode: cold, shard: 103 }
+          - { mode: cold, shard: 104 }
     env:
       NEXUS_USER: ${{ secrets.NEXUS_USER }}
       NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
@@ -62,6 +68,16 @@ jobs:
           "CDB=$($cdb.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           Write-Host "gstreamer registry dir exists: $(Test-Path "$env:LOCALAPPDATA\gstreamer-1.0")"
 
+      # Same step as ci.yml: build the plugin registry outside any test timeout.
+      - name: Build GStreamer plugin registry
+        if: matrix.mode == 'warm'
+        shell: pwsh
+        run: |
+          $sw = [Diagnostics.Stopwatch]::StartNew()
+          gst-inspect-1.0.exe coreelements | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "gst-inspect-1.0 failed: $LASTEXITCODE" }
+          Write-Host "GStreamer registry built in $($sw.Elapsed.TotalSeconds) s"
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -87,16 +103,15 @@ jobs:
           $env:GST_DEBUG_NO_COLOR = '1'
           $env:GST_DEBUG = '*:2,GST_REGISTRY:4,GST_PLUGIN_LOADING:4'
           New-Item -ItemType Directory -Force -Path loop | Out-Null
-          # 1 = fresh runner (as in CI), 2-4 = registry deleted, 5-6 = warm.
-          foreach ($i in 1..6) {
-            if ($i -ge 2 -and $i -le 4) { Remove-Item -Recurse -Force "$env:LOCALAPPDATA\gstreamer-1.0" -ErrorAction SilentlyContinue }
+          $dumpAt = if ('${{ matrix.mode }}' -eq 'cold') { '5000' } else { '22000' }
+          foreach ($i in 1..3) {
             $env:GST_DEBUG_FILE = "$PWD\loop\gst-$i.log"
             ./gradlew.bat :jsyn:test --tests '*DtmfEventsIT*' --rerun --no-daemon --console=plain `
-              "-DsynausonRepoDir=${{ github.workspace }}\synauson-repo" "-Djsyn.cdb=$env:CDB" *> "loop\gradle-$i.txt"
+              "-DsynausonRepoDir=${{ github.workspace }}\synauson-repo" "-Djsyn.cdb=$env:CDB" "-Djsyn.hangDumpAfterMs=$dumpAt" *> "loop\gradle-$i.txt"
             $xml = Get-Content jsyn/build/test-results/test/TEST-com.synauson.jsyn.it.DtmfEventsIT.xml -Raw
             $t = [regex]::Match($xml, 'testsuite [^>]*time="([^"]*)"').Groups[1].Value
             $f = [regex]::Match($xml, 'failures="([0-9]+)"').Groups[1].Value
-            Write-Host "RESULT shard=${{ matrix.shard }} iter=$i time=$t failures=$f"
+            Write-Host "RESULT mode=${{ matrix.mode }} shard=${{ matrix.shard }} iter=$i time=$t failures=$f"
             Copy-Item jsyn/build/test-results/test/TEST-com.synauson.jsyn.it.DtmfEventsIT.xml "loop\junit-$i.xml"
             Select-String -Path "loop\gradle-$i.txt" -Pattern 'dtmf-it \+' | ForEach-Object { $_.Line }
             if ($f -ne '0') { Get-Content "loop\gradle-$i.txt" }
@@ -106,6 +121,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: dtmf-loop-${{ matrix.shard }}
+          name: dtmf-loop-${{ matrix.mode }}-${{ matrix.shard }}
           path: loop/
           retention-days: 7
