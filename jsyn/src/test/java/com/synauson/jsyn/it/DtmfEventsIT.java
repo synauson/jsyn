@@ -31,7 +31,10 @@ import static org.junit.jupiter.api.Assertions.*;
  *   <li>The observer is never called during sends (no phantom events).</li>
  * </ol>
  */
-@Timeout(value = 20, unit = TimeUnit.SECONDS)
+// 30s like the other SIP ITs. The budget includes JSyn start-up, and on Windows
+// every test class starts a fresh JVM (forkEvery = 1), so a class that runs
+// early on a fresh runner also pays the cold GStreamer plugin scan.
+@Timeout(value = 30, unit = TimeUnit.SECONDS)
 class DtmfEventsIT {
 
     @Test
