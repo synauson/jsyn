@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.synauson.jsyn.it.WebRtcNativeParticipantE2eIT" tests="13" skipped="0" failures="0" errors="0" timestamp="2026-09-25T04:55:52" hostname="vm" time="28.191">
+  <properties/>
+  <testcase name="call 1" classname="com.synauson.jsyn.it.WebRtcNativeParticipantE2eIT" time="1.174"/>
+  <testcase name="call 2" classname="com.synauson.jsyn.it.WebRtcNativeParticipantE2eIT" time="1.141"/>
+  <testcase name="call 3" classname="com.synauson.jsyn.it.WebRtcNativeParticipantE2eIT" time="1.123"/>
+  <testcase name="call 4" classname="com.synauson.jsyn.it.WebRtcNativeParticipantE2eIT" time="1.261"/>
+  <testcase name="call 5" classname="com.synauson.jsyn.it.WebRtcNativeParticipantE2eIT" time="1.244"/>
+  <testcase name="call 6" classname="com.synauson.jsyn.it.WebRtcNativeParticipantE2eIT" time="1.208"/>
+  <testcase name="call 7" classname="com.synauson.jsyn.it.WebRtcNativeParticipantE2eIT" time="1.152"/>
+  <testcase name="call 8" classname="com.synauson.jsyn.it.WebRtcNativeParticipantE2eIT" time="1.231"/>
+  <testcase name="hang-up 1" classname="com.synauson.jsyn.it.WebRtcNativeParticipantE2eIT" time="3.794"/>
+  <testcase name="hang-up 2" classname="com.synauson.jsyn.it.WebRtcNativeParticipantE2eIT" time="3.714"/>
+  <testcase name="hang-up 3" classname="com.synauson.jsyn.it.WebRtcNativeParticipantE2eIT" time="3.698"/>
+  <testcase name="hang-up 4" classname="com.synauson.jsyn.it.WebRtcNativeParticipantE2eIT" time="3.717"/>
+  <testcase name="hang-up 5" classname="com.synauson.jsyn.it.WebRtcNativeParticipantE2eIT" time="3.721"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
