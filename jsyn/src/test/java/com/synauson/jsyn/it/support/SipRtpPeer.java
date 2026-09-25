@@ -8,6 +8,9 @@ import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -41,6 +44,7 @@ public final class SipRtpPeer implements AutoCloseable {
     // space across every packet it emits, audio and DTMF alike — not two independent counters.
     private final AtomicInteger sequenceNumber = new AtomicInteger(1000);
     private final List<RtpPacket> captured = new CopyOnWriteArrayList<>();
+    private final Set<Integer> capturedSourcePorts = ConcurrentHashMap.newKeySet();
     private final AtomicBoolean running = new AtomicBoolean(true);
     private final AtomicReference<Throwable> receiveLoopFailure = new AtomicReference<>();
     private final Thread receiveThread;
@@ -140,6 +144,7 @@ public final class SipRtpPeer implements AutoCloseable {
             try {
                 socket.receive(packet);
                 captured.add(RtpPacket.parse(packet.getData(), packet.getLength()));
+                capturedSourcePorts.add(packet.getPort());
             } catch (SocketTimeoutException expected) {
                 // normal: re-check the running flag and loop again
             } catch (RuntimeException malformedPacket) {
@@ -255,9 +260,18 @@ public final class SipRtpPeer implements AutoCloseable {
         return new ArrayList<>(captured);
     }
 
+    /**
+     * The UDP source port of every RTP packet captured so far. With symmetric RTP
+     * (RFC 4961) this is exactly synauson's local RTP port for the participant.
+     */
+    public Set<Integer> capturedSourcePorts() {
+        return new TreeSet<>(capturedSourcePorts);
+    }
+
     /** Forget every packet captured so far, to measure only what arrives next. */
     public void clearCaptured() {
         captured.clear();
+        capturedSourcePorts.clear();
     }
 
     @Override

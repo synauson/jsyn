@@ -199,9 +199,27 @@ instance per JVM process; create it once at startup and share it across your app
 |---|---|---|
 | `FileParticipantSpec` | Plays a WAV / OGG / MP3 file into the conference, or records all participants to disk | Hold music, IVR prompts, full-conference recording |
 | `RecordingParticipantSpec` | Records the conference mix to disk | Compliance recording |
-| `SipParticipantSpec` | Inbound or outbound SIP leg (RTP) | Carrier trunks, softphone callers |
+| `SipParticipantSpec` | SIP leg (RTP) whose peer media is already known | Inbound carrier calls, softphone callers |
+| `SipReservationSpec` + `SipConnectionSpec` | Two-phase SIP leg: reserve our ports for the SDP offer, connect with the answer's `SipRemoteMedia` | Outbound calls |
 | `WebRtcParticipantSpec` | WebRTC peer (SDP offer/answer, ICE) | Browser callers |
 | `NativeParticipant` | In-process bidirectional audio via `ByteBuffer` rings | Custom Java audio sources/sinks |
+
+For an outbound call, `conf.reserveSipParticipant(...)` binds the RTP/RTCP ports for your SDP
+offer and starts nothing; after the answer, `conf.connectSipParticipant(...)` starts the
+participant on those ports and returns the usual `SipParticipantHandle`. `removeParticipant`
+releases a reservation that never connects.
+
+```java
+SipReservation r = conf.reserveSipParticipant(
+    SipReservationSpec.builder().participantId("callee").build());
+// ... send an INVITE whose SDP offer carries r.localRtpPort(), await the answer ...
+SipParticipantHandle callee = conf.connectSipParticipant(SipConnectionSpec.builder()
+    .participantId("callee")
+    .remote(SipRemoteMedia.builder()
+        .remoteIp(answerIp).remoteRtpPort(answerPort).codec("PCMU").dtmfPayloadType(101)
+        .build())
+    .build());
+```
 
 Streaming subscriptions are available for VAD events, SmartTurn events, File end-of-stream events,
 DTMF events (SIP/WebRTC), and ICE candidates (WebRTC). Each subscription returns a `Subscription`

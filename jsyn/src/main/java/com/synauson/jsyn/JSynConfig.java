@@ -1,7 +1,8 @@
 package com.synauson.jsyn;
 
+import com.synauson.jsyn.internal.Args;
 import com.google.gson.Gson;
-import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Configuration for a {@link JSyn} runtime instance.
@@ -21,10 +22,10 @@ public final class JSynConfig {
     public final String modelsDir;
 
     /** Maximum concurrent conferences. {@code null} = unlimited. */
-    public final Integer maxConferences;
+    public final @Nullable Integer maxConferences;
 
     /** Maximum participants per conference. {@code null} = unlimited. */
-    public final Integer maxParticipantsPerConference;
+    public final @Nullable Integer maxParticipantsPerConference;
 
     /** Lower bound (inclusive) of the UDP port range used for SIP RTP. */
     public final int rtpPortMin;
@@ -42,13 +43,13 @@ public final class JSynConfig {
     public final int webrtcJitterBufferMs;
 
     private JSynConfig(Builder b) {
-        this.modelsDir = Objects.requireNonNull(b.modelsDir, "modelsDir");
+        this.modelsDir = Args.notNull(b.modelsDir, "modelsDir");
         this.maxConferences = b.maxConferences;
         this.maxParticipantsPerConference = b.maxParticipantsPerConference;
         this.rtpPortMin = b.rtpPortMin;
         this.rtpPortMax = b.rtpPortMax;
         this.rtpJitterBufferMs = b.rtpJitterBufferMs;
-        this.webrtcStunServer = Objects.requireNonNull(b.webrtcStunServer, "webrtcStunServer");
+        this.webrtcStunServer = Args.notNull(b.webrtcStunServer, "webrtcStunServer");
         this.webrtcJitterBufferMs = b.webrtcJitterBufferMs;
     }
 
@@ -79,13 +80,13 @@ public final class JSynConfig {
      * @since 0.1.0
      */
     public static final class Builder {
-        private String modelsDir;
-        private Integer maxConferences;
-        private Integer maxParticipantsPerConference;
+        private @Nullable String modelsDir;
+        private @Nullable Integer maxConferences;
+        private @Nullable Integer maxParticipantsPerConference;
         private int rtpPortMin = 10000;
         private int rtpPortMax = 20000;
         private int rtpJitterBufferMs = 200;
-        private String webrtcStunServer = "stun://stun.l.google.com:19302";
+        private @Nullable String webrtcStunServer = "stun://stun.l.google.com:19302";
         private int webrtcJitterBufferMs = 200;
 
         /**
@@ -165,8 +166,15 @@ public final class JSynConfig {
          * Materialise an immutable {@link JSynConfig} from this builder's current state.
          *
          * @return the configured {@link JSynConfig} instance
-         * @throws NullPointerException if {@code modelsDir} or {@code webrtcStunServer} is null
+         * @throws com.synauson.jsyn.exception.InvalidArgumentException naming every required
+         *         field that is missing
          */
-        public JSynConfig build() { return new JSynConfig(this); }
+        public JSynConfig build() {
+            Args.required("JSynConfig")
+                .field("modelsDir", modelsDir)
+                .field("webrtcStunServer", webrtcStunServer)
+                .validate();
+            return new JSynConfig(this);
+        }
     }
 }

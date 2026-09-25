@@ -1,16 +1,20 @@
 package com.synauson.jsyn.participant;
 
+import com.synauson.jsyn.exception.InvalidArgumentException;
 import com.synauson.jsyn.SipStats;
+import com.synauson.jsyn.internal.Args;
 import com.synauson.jsyn.internal.NativeBridge;
-import java.util.Objects;
 
 /**
  * Handle to a SIP participant returned by
- * {@link com.synauson.jsyn.participant.Conference#addSipParticipant}.
+ * {@link com.synauson.jsyn.participant.Conference#addSipParticipant} or
+ * {@link com.synauson.jsyn.participant.Conference#connectSipParticipant}.
  *
  * <p>Carries the participant ID and the locally allocated RTP port number that was
- * negotiated during participant construction. Use {@link #localRtpPort()} to relay this
- * port back to the SIP signaling layer for the remote peer's SDP answer.
+ * negotiated during participant construction. For a participant from
+ * {@code addSipParticipant}, relay {@link #localRtpPort()} back to the SIP signaling layer
+ * for the SDP answer; for one from {@code connectSipParticipant} it is the port the
+ * {@link SipReservation} already put in the offer.
  *
  * <p>Provides DTMF send via {@link #sendDtmf(char, int)} and live quality statistics
  * via {@link #stats()}.
@@ -32,13 +36,14 @@ public final class SipParticipantHandle {
      * @param conferenceId  conference identifier; non-null
      * @param participantId participant identifier; non-null
      * @param localRtpPort  locally allocated RTP receive port for this participant
-     * @throws NullPointerException if {@code conferenceId} or {@code participantId} is null
+     * @throws com.synauson.jsyn.exception.InvalidArgumentException if {@code conferenceId} or
+     *         {@code participantId} is null
      */
     public SipParticipantHandle(long runtimeHandle, String conferenceId,
                                  String participantId, int localRtpPort) {
         this.runtimeHandle = runtimeHandle;
-        this.conferenceId = Objects.requireNonNull(conferenceId, "conferenceId");
-        this.participantId = Objects.requireNonNull(participantId, "participantId");
+        this.conferenceId = Args.notNull(conferenceId, "conferenceId");
+        this.participantId = Args.notNull(participantId, "participantId");
         this.localRtpPort = localRtpPort;
     }
 
@@ -65,7 +70,7 @@ public final class SipParticipantHandle {
      *
      * @param digit      the DTMF digit character
      * @param durationMs digit duration in milliseconds (clamped to {@code [70, 500]} by the server)
-     * @throws IllegalArgumentException if {@code digit} is not a valid DTMF character
+     * @throws InvalidArgumentException if {@code digit} is not a valid DTMF character
      * @throws com.synauson.jsyn.exception.NotFoundException if the participant no longer exists
      * @throws com.synauson.jsyn.exception.FailedPreconditionException if DTMF is disabled on this participant
      */
@@ -84,7 +89,7 @@ public final class SipParticipantHandle {
             case 'B': return 13;
             case 'C': return 14;
             case 'D': return 15;
-            default:  throw new IllegalArgumentException("invalid DTMF digit: '" + digit + "'");
+            default:  throw new InvalidArgumentException("invalid DTMF digit: '" + digit + "'");
         }
     }
 

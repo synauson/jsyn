@@ -1,7 +1,8 @@
 package com.synauson.jsyn.spec;
 
+import com.synauson.jsyn.internal.Args;
 import com.google.gson.annotations.SerializedName;
-import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Spec for adding a WebRTC participant.
@@ -35,16 +36,16 @@ public final class WebRtcParticipantSpec {
     public final int jitterBufferMs;
 
     /** Optional VAD configuration; {@code null} disables VAD detection. */
-    public final VadConfig vad;
+    public final @Nullable VadConfig vad;
 
     /** Optional SmartTurn configuration; {@code null} disables SmartTurn detection. */
     @SerializedName("smart_turn")
-    public final SmartTurnConfig smartTurn;
+    public final @Nullable SmartTurnConfig smartTurn;
 
     private WebRtcParticipantSpec(Builder b) {
-        this.participantId = Objects.requireNonNull(b.participantId, "participantId");
-        this.sdpOffer = Objects.requireNonNull(b.sdpOffer, "sdpOffer");
-        this.stunServer = Objects.requireNonNull(b.stunServer, "stunServer");
+        this.participantId = Args.notNull(b.participantId, "participantId");
+        this.sdpOffer = Args.notNull(b.sdpOffer, "sdpOffer");
+        this.stunServer = Args.notNull(b.stunServer, "stunServer");
         this.jitterBufferMs = b.jitterBufferMs;
         this.vad = b.vad;
         this.smartTurn = b.smartTurn;
@@ -64,12 +65,12 @@ public final class WebRtcParticipantSpec {
      * @since 0.1.0
      */
     public static final class Builder {
-        private String participantId;
-        private String sdpOffer;
-        private String stunServer;
+        private @Nullable String participantId;
+        private @Nullable String sdpOffer;
+        private @Nullable String stunServer;
         private int jitterBufferMs;
-        private VadConfig vad;
-        private SmartTurnConfig smartTurn;
+        private @Nullable VadConfig vad;
+        private @Nullable SmartTurnConfig smartTurn;
 
         /**
          * Set the participant ID. Required.
@@ -109,7 +110,7 @@ public final class WebRtcParticipantSpec {
          * @param vad VAD configuration, or {@code null} to disable
          * @return this builder
          */
-        public Builder vad(VadConfig vad) { this.vad = vad; return this; }
+        public Builder vad(@Nullable VadConfig vad) { this.vad = vad; return this; }
 
         /**
          * Enable SmartTurn detection on this participant's audio stream.
@@ -117,14 +118,22 @@ public final class WebRtcParticipantSpec {
          * @param st SmartTurn configuration, or {@code null} to disable
          * @return this builder
          */
-        public Builder smartTurn(SmartTurnConfig st) { this.smartTurn = st; return this; }
+        public Builder smartTurn(@Nullable SmartTurnConfig st) { this.smartTurn = st; return this; }
 
         /**
          * Materialise an immutable {@link WebRtcParticipantSpec}.
          *
          * @return the configured spec
-         * @throws NullPointerException if any required field is null
+         * @throws com.synauson.jsyn.exception.InvalidArgumentException naming every required
+         *         field that is missing
          */
-        public WebRtcParticipantSpec build() { return new WebRtcParticipantSpec(this); }
+        public WebRtcParticipantSpec build() {
+            Args.required("WebRtcParticipantSpec")
+                .field("participantId", participantId)
+                .field("sdpOffer", sdpOffer)
+                .field("stunServer", stunServer)
+                .validate();
+            return new WebRtcParticipantSpec(this);
+        }
     }
 }

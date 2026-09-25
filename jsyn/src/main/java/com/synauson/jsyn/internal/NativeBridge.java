@@ -1,6 +1,7 @@
 package com.synauson.jsyn.internal;
 
 import com.synauson.jsyn.EventStreamObserver;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Internal: not part of the stable jsyn API. Do not use directly from application code.
@@ -50,7 +51,7 @@ public final class NativeBridge {
      *
      * @return {@code null} on success or an error string identifying the missing element
      */
-    public static native String gstreamerSanityCheck();
+    public static native @Nullable String gstreamerSanityCheck();
 
     /**
      * Capture a JSON resource snapshot (memory, CPU, conferences).
@@ -99,8 +100,8 @@ public final class NativeBridge {
     // -------------------------------------------------------------------------
     // Participant lifecycle  (synauson-jni/src/exports/participant.rs)
     //
-    // NOTE: addFileParticipant, addRecordingParticipant, addSipParticipant, and
-    // addWebRtcParticipant each take (handle, confId, specJson) — participant_id is
+    // NOTE: addFileParticipant, addRecordingParticipant, addSipParticipant,
+    // reserveSipParticipant, connectSipParticipant, and addWebRtcParticipant each take (handle, confId, specJson) — participant_id is
     // embedded in specJson. They do NOT take a separate pid argument.
     // -------------------------------------------------------------------------
 
@@ -133,6 +134,26 @@ public final class NativeBridge {
      * @return JSON string {@code {"participantId":"...", "localRtpPort":N}}
      */
     public static native String addSipParticipant(long handle, String confId, String specJson);
+
+    /**
+     * Reserve a SIP participant's RTP/RTCP port pair for an SDP offer; starts nothing.
+     *
+     * @param handle   runtime handle
+     * @param confId   conference identifier
+     * @param specJson JSON-encoded {@code SipReservationJson} (camelCase)
+     * @return JSON string {@code {"participantId":"...", "localRtpPort":N, "localRtcpPort":N}}
+     */
+    public static native String reserveSipParticipant(long handle, String confId, String specJson);
+
+    /**
+     * Start a reserved SIP participant on its reserved ports with the peer's negotiated media.
+     *
+     * @param handle   runtime handle
+     * @param confId   conference identifier
+     * @param specJson JSON-encoded {@code SipConnectionJson} (camelCase)
+     * @return JSON string {@code {"participantId":"...", "localRtpPort":N}}
+     */
+    public static native String connectSipParticipant(long handle, String confId, String specJson);
 
     /**
      * Add a WebRTC participant.

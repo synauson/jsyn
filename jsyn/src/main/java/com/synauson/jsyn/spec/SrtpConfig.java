@@ -1,5 +1,7 @@
 package com.synauson.jsyn.spec;
 
+import com.synauson.jsyn.internal.Args;
+
 /**
  * SRTP key material for a SIP participant.
  *
@@ -25,9 +27,10 @@ public final class SrtpConfig {
      *
      * @param ourKey   30-byte master key for the local send path
      * @param theirKey 30-byte master key for the remote send path
+     * @throws com.synauson.jsyn.exception.InvalidArgumentException if either key is null
      */
     public SrtpConfig(byte[] ourKey, byte[] theirKey) {
-        this.ourKey = ourKey;
-        this.theirKey = theirKey;
+        this.ourKey = Args.notNull(ourKey, "ourKey");
+        this.theirKey = Args.notNull(theirKey, "theirKey");
     }
 }

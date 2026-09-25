@@ -1,6 +1,6 @@
 package com.synauson.jsyn.spec;
 
-import java.util.Objects;
+import com.synauson.jsyn.internal.Args;
 
 /**
  * A URI for priority audio file injection.
@@ -18,9 +18,9 @@ public final class PriorityFile {
      * Construct a priority file entry.
      *
      * @param uri GStreamer-compatible URI; non-null
-     * @throws NullPointerException if {@code uri} is null
+     * @throws com.synauson.jsyn.exception.InvalidArgumentException if {@code uri} is null
      */
     public PriorityFile(String uri) {
-        this.uri = Objects.requireNonNull(uri, "uri");
+        this.uri = Args.notNull(uri, "uri");
     }
 }

@@ -1,5 +1,6 @@
 package com.synauson.jsyn.ring;
 
+import com.synauson.jsyn.exception.InvalidArgumentException;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.nio.ByteBuffer;
@@ -34,13 +35,13 @@ public final class SpscRing {
      *
      * @param buffer a direct {@link ByteBuffer} over the ring's shared memory;
      *               must be direct and have the correct layout per {@link RingLayout}
-     * @throws IllegalArgumentException if {@code buffer} is not direct
+     * @throws InvalidArgumentException if {@code buffer} is not direct
      * @throws IllegalStateException    if the capacity field in the ring header is invalid
      *                                  (not a positive power of two, or exceeds {@link Integer#MAX_VALUE})
      */
     public SpscRing(ByteBuffer buffer) {
         if (!buffer.isDirect()) {
-            throw new IllegalArgumentException("ring ByteBuffer must be direct");
+            throw new InvalidArgumentException("ring ByteBuffer must be direct");
         }
         this.buffer = buffer.duplicate().order(ByteOrder.nativeOrder());
         long cap = (long) LONG_VIEW.get(this.buffer, RingLayout.CAPACITY_OFFSET);
