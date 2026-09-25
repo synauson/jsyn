@@ -1,5 +1,6 @@
 package com.synauson.jsyn.participant;
 
+import com.synauson.jsyn.exception.InvalidArgumentException;
 import com.synauson.jsyn.SipStats;
 import com.synauson.jsyn.internal.Args;
 import com.synauson.jsyn.internal.NativeBridge;
@@ -69,7 +70,7 @@ public final class SipParticipantHandle {
      *
      * @param digit      the DTMF digit character
      * @param durationMs digit duration in milliseconds (clamped to {@code [70, 500]} by the server)
-     * @throws IllegalArgumentException if {@code digit} is not a valid DTMF character
+     * @throws InvalidArgumentException if {@code digit} is not a valid DTMF character
      * @throws com.synauson.jsyn.exception.NotFoundException if the participant no longer exists
      * @throws com.synauson.jsyn.exception.FailedPreconditionException if DTMF is disabled on this participant
      */
@@ -88,7 +89,7 @@ public final class SipParticipantHandle {
             case 'B': return 13;
             case 'C': return 14;
             case 'D': return 15;
-            default:  throw new IllegalArgumentException("invalid DTMF digit: '" + digit + "'");
+            default:  throw new InvalidArgumentException("invalid DTMF digit: '" + digit + "'");
         }
     }
 

@@ -37,9 +37,9 @@ final class JSynTestHelpers {
     static Path resolveSynausonRepo() {
         String override = System.getProperty("synausonRepoDir");
         if (override != null) {
-            return Path.of(override).toAbsolutePath();
+            return Path.of(override).toAbsolutePath().normalize();
         }
-        return Path.of("../../synauson").toAbsolutePath();
+        return Path.of("../../synauson").toAbsolutePath().normalize();
     }
 
     /** Create a new JSyn instance with a unique RTP port range. */

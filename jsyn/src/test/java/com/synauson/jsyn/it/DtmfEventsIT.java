@@ -3,6 +3,7 @@ package com.synauson.jsyn.it;
 import com.synauson.jsyn.JSyn;
 import com.synauson.jsyn.Subscription;
 import com.synauson.jsyn.event.DtmfEvent;
+import com.synauson.jsyn.exception.InvalidArgumentException;
 import com.synauson.jsyn.participant.Conference;
 import com.synauson.jsyn.participant.SipParticipantHandle;
 import com.synauson.jsyn.spec.SipParticipantSpec;
@@ -27,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * <ol>
  *   <li>DTMF event subscription opens without error.</li>
  *   <li>All 16 valid DTMF characters (0-9, *, #, A-D) are accepted by sendDtmf().</li>
- *   <li>Invalid characters are rejected with IllegalArgumentException.</li>
+ *   <li>Invalid characters are rejected with InvalidArgumentException.</li>
  *   <li>The observer is never called during sends (no phantom events).</li>
  * </ol>
  */
@@ -67,10 +68,10 @@ class DtmfEventsIT {
                 }
 
                 // Invalid characters must be rejected.
-                assertThrows(IllegalArgumentException.class, () -> sip.sendDtmf('X', 100),
-                        "sendDtmf('X') should throw IllegalArgumentException");
-                assertThrows(IllegalArgumentException.class, () -> sip.sendDtmf('Z', 100),
-                        "sendDtmf('Z') should throw IllegalArgumentException");
+                assertThrows(InvalidArgumentException.class, () -> sip.sendDtmf('X', 100),
+                        "sendDtmf('X') should throw InvalidArgumentException");
+                assertThrows(InvalidArgumentException.class, () -> sip.sendDtmf('Z', 100),
+                        "sendDtmf('Z') should throw InvalidArgumentException");
             }
 
             assertEquals(0, observerCallCount.get(),

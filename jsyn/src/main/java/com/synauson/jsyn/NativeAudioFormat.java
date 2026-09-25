@@ -1,5 +1,7 @@
 package com.synauson.jsyn;
 
+import com.synauson.jsyn.exception.InvalidArgumentException;
+
 /**
  * Audio format for in-process native participant I/O.
  *
@@ -62,12 +64,12 @@ public enum NativeAudioFormat {
      *
      * @param id stable format ID (see {@link #id()})
      * @return the matching enum constant
-     * @throws IllegalArgumentException if no constant has that ID
+     * @throws InvalidArgumentException if no constant has that ID
      */
     public static NativeAudioFormat fromId(int id) {
         for (NativeAudioFormat f : values()) {
             if (f.id == id) return f;
         }
-        throw new IllegalArgumentException("unknown NativeAudioFormat id: " + id);
+        throw new InvalidArgumentException("unknown NativeAudioFormat id: " + id);
     }
 }
