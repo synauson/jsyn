@@ -142,7 +142,7 @@ jobs:
   # the runtime to exist so the pre-built native library can load.
   # -------------------------------------------------------------------------
   test-windows:
-    runs-on: windows-2022
+    runs-on: [self-hosted, Windows, X64, synauson]
     needs: java-compile
     timeout-minutes: 45
     env:
@@ -170,9 +170,9 @@ jobs:
         if: steps.cache-deps.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
-          Start-BitsTransfer `
-            -Source "https://gstreamer.freedesktop.org/data/pkg/windows/1.26.7/msvc/gstreamer-1.0-msvc-x86_64-1.26.7.msi" `
-            -Destination (Join-Path $HOME 'gst-runtime.msi')
+          Invoke-WebRequest `
+            -Uri "https://gstreamer.freedesktop.org/data/pkg/windows/1.26.7/msvc/gstreamer-1.0-msvc-x86_64-1.26.7.msi" `
+            -OutFile (Join-Path $HOME 'gst-runtime.msi')
 
       - name: Install GStreamer runtime (system-wide, silent)
         shell: pwsh
@@ -205,9 +205,9 @@ jobs:
         if: steps.cache-deps.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
-          Start-BitsTransfer `
-            -Source "https://github.com/microsoft/onnxruntime/releases/download/v1.24.4/onnxruntime-win-x64-1.24.4.zip" `
-            -Destination "$HOME/onnxruntime-win-x64.zip"
+          Invoke-WebRequest `
+            -Uri "https://github.com/microsoft/onnxruntime/releases/download/v1.24.4/onnxruntime-win-x64-1.24.4.zip" `
+            -OutFile "$HOME/onnxruntime-win-x64.zip"
 
       - name: Extract ONNX Runtime
         shell: pwsh
