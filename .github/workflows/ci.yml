@@ -53,23 +53,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # synauson/synauson is private: synauson[bot] mints a short-lived token that
-      # can only read it.
-      - name: Mint a read-only token for synauson/synauson
-        id: synauson-token
-        uses: actions/create-github-app-token@v2
-        with:
-          app-id: ${{ vars.SYNAUSON_APP_ID }}
-          private-key: ${{ secrets.SYNAUSON_APP_PRIVATE_KEY }}
-          owner: synauson
-          repositories: synauson
-          permission-contents: read
-
       - name: Checkout synauson (models + fixtures)
         uses: actions/checkout@v4
         with:
           repository: synauson/synauson
-          token: ${{ steps.synauson-token.outputs.token }}
+          # synauson/synauson is private; this deploy key can only read it.
+          ssh-key: ${{ secrets.SYNAUSON_DEPLOY_KEY }}
           path: synauson-repo
 
       - name: Install GStreamer runtime packages
@@ -163,23 +152,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # synauson/synauson is private: synauson[bot] mints a short-lived token that
-      # can only read it.
-      - name: Mint a read-only token for synauson/synauson
-        id: synauson-token
-        uses: actions/create-github-app-token@v2
-        with:
-          app-id: ${{ vars.SYNAUSON_APP_ID }}
-          private-key: ${{ secrets.SYNAUSON_APP_PRIVATE_KEY }}
-          owner: synauson
-          repositories: synauson
-          permission-contents: read
-
       - name: Checkout synauson (models + fixtures)
         uses: actions/checkout@v4
         with:
           repository: synauson/synauson
-          token: ${{ steps.synauson-token.outputs.token }}
+          # synauson/synauson is private; this deploy key can only read it.
+          ssh-key: ${{ secrets.SYNAUSON_DEPLOY_KEY }}
           path: synauson-repo
 
       - name: Cache GStreamer + ORT installer downloads
