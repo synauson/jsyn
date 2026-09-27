@@ -1,0 +1,96 @@
+package com.synauson.jsyn.it;
+
+import com.synauson.jsyn.JSyn;
+import com.synauson.jsyn.JSynConfig;
+import com.synauson.jsyn.NativeAudioFormat;
+import com.synauson.jsyn.exception.FailedPreconditionException;
+import com.synauson.jsyn.exception.InvalidArgumentException;
+import com.synauson.jsyn.participant.Conference;
+import com.synauson.jsyn.participant.NativeParticipant;
+import com.synauson.jsyn.spec.NativeParticipantSpec;
+import com.synauson.jsyn.spec.VadConfig;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+/** {@link JSyn#importModels} and how detectors behave when the store lacks a model. */
+@Timeout(value = 60, unit = TimeUnit.SECONDS)
+class ModelStoreIT {
+
+    private static Path workspaceModels() {
+        return JSynTestHelpers.resolveSynausonRepo().resolve("models");
+    }
+
+    @Test
+    void importInstallsEveryPinnedModelInTheStoreLayoutAndIsIdempotent(@TempDir Path store)
+            throws Exception {
+        assertEquals(List.of("silero-vad", "smart-turn"),
+                JSyn.importModels(workspaceModels(), store));
+        assertTrue(Files.isRegularFile(store.resolve("silero-vad/5/silero_vad.onnx")));
+        assertTrue(Files.isRegularFile(store.resolve("smart-turn/3.2-cpu/smart_turn_v3.onnx")));
+        assertEquals(List.of("silero-vad", "smart-turn"),
+                JSyn.importModels(workspaceModels(), store));
+    }
+
+    @Test
+    void importRejectsACorruptModelAndLeavesTheStoreWithoutIt(@TempDir Path tmp)
+            throws Exception {
+        Path src = Files.createDirectory(tmp.resolve("src"));
+        byte[] bytes = Files.readAllBytes(workspaceModels().resolve("silero_vad.onnx"));
+        bytes[4096] ^= 0x5a;
+        Files.write(src.resolve("silero_vad.onnx"), bytes);
+        Path store = tmp.resolve("store");
+
+        FailedPreconditionException e = assertThrows(FailedPreconditionException.class,
+                () -> JSyn.importModels(src, store));
+        assertTrue(e.getMessage().contains("sha256"), e.getMessage());
+        assertFalse(Files.exists(store.resolve("silero-vad/5/silero_vad.onnx")));
+    }
+
+    @Test
+    void importRejectsAFolderWithNoModels(@TempDir Path tmp) {
+        InvalidArgumentException e = assertThrows(InvalidArgumentException.class,
+                () -> JSyn.importModels(tmp, tmp.resolve("store")));
+        assertTrue(e.getMessage().contains("no catalog model files"), e.getMessage());
+        assertThrows(InvalidArgumentException.class, () -> JSyn.importModels(null, tmp));
+    }
+
+    @Test
+    void vadWithAnEmptyStoreFailsBeforeAnythingIsBuilt(@TempDir Path emptyStore) {
+        int rtpMin = JSynTestHelpers.nextRtpPortMin();
+        JSynConfig cfg = JSynConfig.builder()
+                .modelStore(emptyStore.toString())
+                .rtpPortMin(rtpMin)
+                .rtpPortMax(rtpMin + 199)
+                .build();
+        long ts = System.nanoTime();
+        String confId = "model-store-it-" + ts;
+        String pid = "ms-p-" + ts;
+        try (JSyn syn = new JSyn(cfg);
+             Conference conf = syn.startConference(confId)) {
+            FailedPreconditionException e = assertThrows(FailedPreconditionException.class,
+                    () -> conf.addNativeParticipant(pid, NativeParticipantSpec.builder()
+                            .format(NativeAudioFormat.PCM_S16LE16K_MONO)
+                            .vad(VadConfig.defaults())
+                            .build()));
+            assertTrue(e.getMessage().contains("silero-vad"), e.getMessage());
+            assertTrue(e.getMessage().contains("not installed"), e.getMessage());
+
+            // Nothing was half built: a leftover participant would make the
+            // same id fail as a duplicate, so re-adding it without VAD works.
+            try (NativeParticipant p = conf.addNativeParticipant(pid,
+                    NativeParticipantSpec.builder()
+                            .format(NativeAudioFormat.PCM_S16LE16K_MONO)
+                            .build())) {
+                assertEquals(pid, p.id());
+            }
+        }
+    }
+}
