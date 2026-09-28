@@ -1,7 +1,7 @@
 
 allprojects {
     group = "com.synauson"
-    version = (System.getenv("JSYN_VERSION") ?: "0.1.0-SNAPSHOT").removePrefix("v")
+    version = (System.getenv("JSYN_VERSION") ?: "1.5.0-SNAPSHOT").removePrefix("v")
     repositories {
         mavenCentral()
         // jsyn-natives-linux and jsyn-natives-windows are published to the public
@@ -10,7 +10,7 @@ allprojects {
         maven { url = uri("https://maven.synauson.com/snapshots") }
     }
 
-    // jsyn-natives-* is consumed as 1.0.0-SNAPSHOT, a *changing* module: the
+    // When jsynNativesVersion is a -SNAPSHOT it is a *changing* module: the
     // coordinates stay fixed while synauson republishes new content behind
     // them. Gradle caches changing modules for 24 hours by default, and CI
     // restores ~/.gradle/caches across runs via actions/cache restore-keys —
