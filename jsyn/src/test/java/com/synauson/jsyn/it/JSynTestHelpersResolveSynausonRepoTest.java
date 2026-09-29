@@ -49,7 +49,7 @@ class JSynTestHelpersResolveSynausonRepoTest {
         System.clearProperty("synausonRepoDir");
         Path resolved = JSynTestHelpers.resolveSynausonRepo();
         // From jsyn/jsyn/ (the Gradle project dir), two levels up reaches the
-        // shared parent (~/projects/synauson/), then into the sibling checkout.
+        // parent directory holding both checkouts, then into the sibling checkout.
         Path expected = Path.of("../../synauson").toAbsolutePath().normalize();
         assertEquals(expected, resolved.normalize());
     }

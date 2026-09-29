@@ -30,8 +30,8 @@ final class JSynTestHelpers {
      *
      * <p>CI passes {@code -DsynausonRepoDir=<checkout path>} explicitly,
      * since the two repos are checked out independently there. Local runs
-     * fall back to the standard sibling-repo layout
-     * ({@code ~/projects/synauson/{jsyn,synauson}}). Two levels up
+     * fall back to a synauson checkout next to this one (both
+     * checkouts in the same parent directory). Two levels up
      * from this Gradle project directory
      * ({@code jsyn/jsyn/}) reaches the shared parent, then back down into
      * the sibling checkout.
