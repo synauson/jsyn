@@ -111,6 +111,24 @@ public final class WebRtcBrowserPeer implements AutoCloseable {
             "  return packets;",
             "}",
             "",
+            "// The remote end of the ICE pair the transport selected: the address and",
+            "// port on the synauson side that all of the call's media flows through.",
+            "async function selectedRemoteCandidate() {",
+            "  if (!window.__pc) { return null; }",
+            "  var stats = await window.__pc.getStats();",
+            "  var pairId = null;",
+            "  stats.forEach(function(report) {",
+            "    if (report.type === 'transport' && report.selectedCandidatePairId) {",
+            "      pairId = report.selectedCandidatePairId;",
+            "    }",
+            "  });",
+            "  var pair = pairId ? stats.get(pairId) : null;",
+            "  var remote = pair ? stats.get(pair.remoteCandidateId) : null;",
+            "  if (!remote) { return null; }",
+            "  return {address: remote.address || remote.ip || '', port: remote.port,",
+            "          protocol: remote.protocol, candidateType: remote.candidateType};",
+            "}",
+            "",
             "async function receivedAudioEnergy() {",
             "  var best = 0;",
             "  (await trackInboundStats()).forEach(function(report) {",
@@ -210,6 +228,17 @@ public final class WebRtcBrowserPeer implements AutoCloseable {
     /** The peer connection's {@code connectionState} ({@code "connected"} once ICE and DTLS are up). */
     public String connectionState() {
         return (String) page.evaluate("() => connectionState()");
+    }
+
+    /**
+     * The synauson end of the ICE candidate pair the browser selected, with keys
+     * {@code address}, {@code port}, {@code protocol} and {@code candidateType}; {@code null}
+     * until ICE has selected a pair. Every RTP, RTCP and DTLS packet of the call goes through
+     * that address and port.
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> selectedRemoteCandidate() {
+        return (Map<String, Object>) page.evaluate("() => selectedRemoteCandidate()");
     }
 
     /** Total RTP packets the browser's receiver has taken in from synauson so far. */

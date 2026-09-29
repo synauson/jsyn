@@ -2,6 +2,7 @@ package com.synauson.jsyn;
 
 import com.google.gson.Gson;
 import com.google.gson.annotations.SerializedName;
+import org.jspecify.annotations.Nullable;
 
 /**
  * RTP/ICE quality statistics for a WebRTC participant.
@@ -61,6 +62,15 @@ public final class WebRtcStats {
     @SerializedName("rtt_ms")
     public final long rttMs;
 
+    /**
+     * The WebRTC options the participant runs with. {@code null} from native runtimes
+     * older than 1.5.0, which ignore per-participant options.
+     *
+     * @since 1.5.0
+     */
+    @SerializedName("effective_options")
+    public final @Nullable WebRtcEffectiveOptions effectiveOptions;
+
     private WebRtcStats() {
         this.participantId = null;
         this.iceConnectionState = null;
@@ -72,6 +82,7 @@ public final class WebRtcStats {
         this.bytesSent = 0;
         this.jitterNs = 0;
         this.rttMs = 0;
+        this.effectiveOptions = null;
     }
 
     /**
