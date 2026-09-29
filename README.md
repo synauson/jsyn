@@ -1,55 +1,113 @@
-# jsyn — Java client for synauson
+# jsyn
 
-`jsyn` is an **in-process** Java binding to the [synauson](https://synauson.com) audio media server.
-The synauson Rust runtime — GStreamer pipelines, ONNX Runtime detectors, participant graph, and
-audio router — runs inside your JVM via JNI. No separate process to manage, no gRPC traffic on
-the loopback.
+[![ci](https://github.com/synauson/jsyn/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/synauson/jsyn/actions/workflows/ci.yml)
 
-For the gRPC consumption model (remote `synauson` server, language-agnostic clients), see the
-[synauson API documentation](https://synauson.com/docs/api).
+jsyn is the Java SDK for the [Synauson](https://synauson.com) media engine. It runs the
+engine inside your JVM through JNI, so there is no separate server to deploy. The engine
+includes GStreamer media pipelines, an audio router, and ONNX voice-activity and
+end-of-turn detectors. From Java you create conferences, connect SIP, WebRTC, file and
+in-process audio participants, route audio between them, and receive detector and
+signalling events.
 
----
+- [Requirements](#requirements)
+- [Install](#install)
+- [Quickstart](#quickstart)
+- [Concepts](#concepts)
+- [Use cases, shown by the tests](#use-cases-shown-by-the-tests)
+- [Complete applications](#complete-applications)
+- [Configuration and logging](#configuration-and-logging)
+- [Troubleshooting](#troubleshooting)
+- [Versions](#versions)
+- [Building and testing jsyn](#building-and-testing-jsyn)
 
-## Artifacts
+## Requirements
 
-| Maven coordinate | What it is | Required on |
-|---|---|---|
-| `com.synauson:jsyn:<version>` | Pure-Java API — `JSyn`, `Conference`, participant handles, event streams | Always |
-| `com.synauson:jsyn-natives-linux:<version>` | `libsynauson_jni.so` + `libonnxruntime.so.1.24.4`, x86\_64 | Linux runtime |
-| `com.synauson:jsyn-natives-windows:<version>` | `synauson_jni.dll` + `onnxruntime.dll`, x86\_64 | Windows runtime |
-
-Add the pure-Java module plus the native module(s) for the platforms you ship on. Both `linux` and
-`windows` natives can be on the classpath simultaneously — `NativeLoader` picks the right one at
-JVM startup.
-
-All modules are published to the public Synauson Maven repository. No credentials are needed
-to download them; running Synauson needs a license key (`JSynConfig.licenseKey`).
-
-| Repository | URL |
+| | |
 |---|---|
-| Releases | `https://maven.synauson.com/releases` |
-| Snapshots (`*-SNAPSHOT`, rebuilt from `main`) | `https://maven.synauson.com/snapshots` |
+| Java | 11 or newer |
+| Platforms | Linux x86_64 (glibc 2.34 or newer), Windows x86_64. macOS and ARM are not supported. |
+| GStreamer | 1.26 is recommended and 1.24 is the minimum. **1.28 is not supported**: it changed the `webrtcbin` pad API, which breaks WebRTC. |
+| ONNX Runtime | Nothing to install. 1.24.4 ships inside the `jsyn-natives-*` jar. |
+| License key | Required. Free-tier keys work. Get one at [synauson.com](https://synauson.com). |
+| Network | At startup the engine exchanges the key at `license.synauson.com` and downloads the models your license includes from `dl.synauson.com`. See [offline hosts](#licensing-and-models) if the host has no internet access. |
 
-### Gradle
+### Linux
+
+On Debian or Ubuntu, install the GStreamer runtime:
+
+```bash
+sudo apt-get install -y libgstreamer1.0-0 gstreamer1.0-plugins-base \
+    gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-nice
+```
+
+`gstreamer1.0-nice` provides ICE for WebRTC and is easy to miss. CI also installs
+`gstreamer1.0-plugins-ugly` and `gstreamer1.0-libav`. On other distributions, install the
+equivalent packages; the ICE plugin often ships as its own package. To check the install:
+
+```bash
+gst-inspect-1.0 --version
+gst-inspect-1.0 --exists errorignore && gst-inspect-1.0 --exists webrtcbin \
+    && gst-inspect-1.0 --exists nicesrc && echo ok
+```
+
+### Windows
+
+1. Install the GStreamer 1.26.7 MSVC runtime installer,
+   [`gstreamer-1.0-msvc-x86_64-1.26.7.msi`](https://gstreamer.freedesktop.org/data/pkg/windows/1.26.7/msvc/gstreamer-1.0-msvc-x86_64-1.26.7.msi),
+   system-wide with the Complete profile, to `C:\gstreamer\1.0\msvc_x86_64`. You do not
+   need the devel installer.
+2. In an elevated PowerShell, set `GSTREAMER_1_0_ROOT_MSVC_X86_64` and add `bin` to the
+   machine `Path`:
+   ```powershell
+   [Environment]::SetEnvironmentVariable("GSTREAMER_1_0_ROOT_MSVC_X86_64", "C:\gstreamer\1.0\msvc_x86_64", "Machine")
+   $p = [Environment]::GetEnvironmentVariable("Path", "Machine")
+   [Environment]::SetEnvironmentVariable("Path", "$p;C:\gstreamer\1.0\msvc_x86_64\bin", "Machine")
+   ```
+3. Sign out and back in. Then, once per Windows user, build GStreamer's plugin registry
+   with `gst-inspect-1.0.exe coreelements`. If you skip this, the first `new JSyn(...)`
+   performs the scan, which took 7 to 44 seconds on fresh CI machines.
+
+For a step-by-step walkthrough, see the
+[Windows quickstart](https://github.com/synauson/examples/tree/main/java/jsyn-windows-quickstart).
+
+## Install
+
+jsyn is split into a pure-Java API jar plus one natives jar per platform. All of them come
+from the public Synauson Maven repository, which needs no credentials. You can put both
+natives jars on the classpath; jsyn loads the one that matches the running OS.
+
+| Artifact | Contents |
+|---|---|
+| `com.synauson:jsyn` | The API: `JSyn`, `Conference`, specs, events, handles |
+| `com.synauson:jsyn-natives-linux` | `libsynauson_jni.so` and ONNX Runtime, Linux x86_64 |
+| `com.synauson:jsyn-natives-windows` | `synauson_jni.dll` and ONNX Runtime, Windows x86_64 |
+
+Gradle (Kotlin DSL):
 
 ```kotlin
 repositories {
     mavenCentral()
     maven { url = uri("https://maven.synauson.com/releases") }
-    // Only if you use -SNAPSHOT versions:
-    // maven { url = uri("https://maven.synauson.com/snapshots") }
 }
 
+val jsynVersion = "1.5.0"
+val jsynNativesVersion = "1.5.0" // see "Versions" below
+
 dependencies {
-    implementation("com.synauson:jsyn:VERSION")
-    runtimeOnly("com.synauson:jsyn-natives-linux:VERSION")   // Linux
-    runtimeOnly("com.synauson:jsyn-natives-windows:VERSION") // Windows
+    implementation("com.synauson:jsyn:$jsynVersion")
+    runtimeOnly("com.synauson:jsyn-natives-linux:$jsynNativesVersion")
+    runtimeOnly("com.synauson:jsyn-natives-windows:$jsynNativesVersion")
 }
 ```
 
-### Maven
+Maven:
 
 ```xml
+<properties>
+  <jsyn.version>1.5.0</jsyn.version>
+  <jsyn.natives.version>1.5.0</jsyn.natives.version>
+</properties>
+
 <repositories>
   <repository>
     <id>synauson</id>
@@ -61,284 +119,271 @@ dependencies {
   <dependency>
     <groupId>com.synauson</groupId>
     <artifactId>jsyn</artifactId>
-    <version>VERSION</version>
+    <version>${jsyn.version}</version>
   </dependency>
   <dependency>
     <groupId>com.synauson</groupId>
     <artifactId>jsyn-natives-linux</artifactId>
-    <version>VERSION</version>
+    <version>${jsyn.natives.version}</version>
     <scope>runtime</scope>
   </dependency>
+  <!-- and/or jsyn-natives-windows -->
 </dependencies>
 ```
 
-JDK 11+ required.
+jsyn depends only on Gson and the JSpecify annotations.
 
----
+## Quickstart
 
-## Runtime prerequisites
+The program below plays a WAV file into a conference and prints each playback event. Set
+`SYNAUSON_LICENSE_KEY`, then run it with the path to a WAV file as its argument.
 
-### Linux (x86\_64)
-
-Install GStreamer 1.26.x and its plugin sets:
-
-```bash
-# Debian / Ubuntu
-sudo apt install -y libgstreamer1.0-0 gstreamer1.0-plugins-base \
-    gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
-    gstreamer1.0-plugins-ugly libnice10
-
-# Fedora / RHEL
-sudo dnf install -y gstreamer1 gstreamer1-plugins-base \
-    gstreamer1-plugins-good gstreamer1-plugins-bad-free \
-    gstreamer1-plugins-ugly libnice
-
-# Arch
-sudo pacman -S gstreamer gst-plugins-base gst-plugins-good \
-    gst-plugins-bad gst-plugins-ugly libnice
-```
-
-ONNX Runtime is bundled inside `jsyn-natives-linux.jar` — nothing extra to install.
-
-### Windows (x86\_64)
-
-Install GStreamer 1.26.7 MSVC **system-wide**. ONNX Runtime is bundled in the JAR.
-
-1. Download the MSVC installer:
-   <https://gstreamer.freedesktop.org/data/pkg/windows/1.26.7/msvc/gstreamer-1.0-msvc-x86_64-1.26.7.msi>
-2. Install with **Complete** profile to the default location (`C:\gstreamer\1.0\msvc_x86_64`).
-3. Set the following machine-wide environment variables (elevated PowerShell):
-   ```powershell
-   [Environment]::SetEnvironmentVariable(
-       "GSTREAMER_1_0_ROOT_MSVC_X86_64",
-       "C:\gstreamer\1.0\msvc_x86_64",
-       "Machine")
-   $p = [Environment]::GetEnvironmentVariable("Path","Machine")
-   if (-not $p.Contains("C:\gstreamer\1.0\msvc_x86_64\bin")) {
-       [Environment]::SetEnvironmentVariable(
-           "Path", "$p;C:\gstreamer\1.0\msvc_x86_64\bin", "Machine")
-   }
-   ```
-4. Reboot or sign out/in to refresh PATH for new processes.
-5. Once per Windows user account, build the GStreamer plugin registry: `gst-inspect-1.0.exe coreelements`.
-   The first GStreamer init on a machine scans every installed plugin, which took 7–44 s on fresh CI
-   runners; skip this and the scan happens inside the first `new JSyn(...)`.
-
-Verify with: `gst-launch-1.0.exe --version` from a fresh PowerShell prompt.
-
-**Minimum version:** GStreamer 1.24+. GStreamer 1.22.x and older will not work.
-
----
-
-## License key
-
-jsyn runs under a license key from Synauson (free-tier keys included). Pass it with
-`JSynConfig.builder().licenseKey(...)`, or set `SYNAUSON_LICENSE_KEY` in the environment.
-At startup the runtime exchanges it at `license.synauson.com` for a signed license file,
-caches it in the state directory (`JSynConfig.stateDir`, default `$SYNAUSON_STATE_DIR` or
-the per-user state directory) and renews it about once a day. The license lists the AI
-capabilities you may use (for example `FEATURE_VAD`, `FEATURE_TURN_DETECTION`) and your
-usage limits.
-
-- No key, or a key the licensing server refuses: `new JSyn(...)` throws.
-- The licensing server can't be reached: the runtime starts with the cached license while
-  it's valid (otherwise with free-tier limits) and upgrades when the server answers.
-- A capability your license doesn't include: adding a participant with that detector throws
-  `PermissionDeniedException` naming the capability.
-- Over a usage limit: the new conference or detector throws `LimitExceededException`
-  naming the limit. Nothing already running is ever stopped.
-
-`jsyn.capabilities()` reports the license, its limits and current usage, and each model's
-state.
-
-## Models
-
-Detectors load their ONNX models from a **model store**, laid out as
-`<model-id>/<version>/<file>`:
-
-```
-<model-store>/
-├── silero-vad/5/silero_vad.onnx            (Voice Activity Detection)
-└── smart-turn/3.2-cpu/smart_turn_v3.onnx   (end-of-turn detection)
-```
-
-At startup the runtime downloads the models your license includes into the store, in the
-background, and checks each file against the size, SHA-256 and signature this release pins.
-The store is `JSynConfig.modelStore` if set, else `$SYNAUSON_MODEL_STORE`, else the per-user
-cache (`%LOCALAPPDATA%\synauson\models` on Windows, `~/.cache/synauson/models` on Linux). A
-participant that asks for a detector whose model hasn't arrived yet throws
-`FailedPreconditionException` naming the model.
-
-For hosts without internet access, fill a store from a folder of the `.onnx` files instead
-(`offline(true)` plus a `licenseFile` from Synauson):
-
+<!-- snippet: quickstart -->
 ```java
-JSyn.importModels(Path.of("/path/to/models"), Path.of("/opt/synauson/models"));
-```
+import com.synauson.jsyn.JSyn;
+import com.synauson.jsyn.JSynConfig;
+import com.synauson.jsyn.Subscription;
+import com.synauson.jsyn.event.FileEvent;
+import com.synauson.jsyn.participant.Conference;
+import com.synauson.jsyn.spec.FileParticipantSpec;
+import java.nio.file.Path;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
----
-
-## Quick start
-
-```java
-import com.synauson.jsyn.*;
-import com.synauson.jsyn.participant.*;
-
-public class JsynHello {
+public class Quickstart {
     public static void main(String[] args) throws Exception {
+        String uri = Path.of(args[0]).toUri().toString(); // a WAV file -> file:///...
+
         JSynConfig config = JSynConfig.builder()
             .licenseKey(System.getenv("SYNAUSON_LICENSE_KEY"))
-            .modelStore("/opt/synauson/models")  // or "C:\\synauson\\models"
-            .maxConferences(100)
             .build();
 
-        try (JSyn jsyn = new JSyn(config)) {
-            try (Conference conf = jsyn.startConference("call-12345")) {
+        try (JSyn jsyn = new JSyn(config);
+             Conference conf = jsyn.startConference("quickstart")) {
+            CountDownLatch done = new CountDownLatch(1);
 
-                // Add a file-playback participant
-                FileParticipantHandle file = conf.addFileParticipant(
-                    FileParticipantSpec.builder()
-                        .participantId("hold-music")
-                        .filePath("/audio/hold.wav")
-                        .audioFormat(NativeAudioFormat.PCM_S16LE16K_MONO)
-                        .build());
-
-                // Subscribe to VAD events from another participant
-                Subscription sub = conf.streamVadEvents("agent", event ->
-                    System.out.println("VAD: " + event.state()));
-
-                // ... do work ...
-
-                sub.cancel();
+            // Subscribe before adding the participant so no event is missed.
+            // Events arrive on a native thread: hand work off, don't block it.
+            try (Subscription events = conf.streamFileEvents("player", event -> {
+                System.out.println(event.getClass().getSimpleName());
+                if (event instanceof FileEvent.Eos || event instanceof FileEvent.FileError) {
+                    done.countDown();
+                }
+            })) {
+                conf.addFileParticipant(FileParticipantSpec.builder()
+                    .id("player")
+                    .uri(uri)
+                    .build());
+                done.await(60, TimeUnit.SECONDS);
             }
-        }
+        } // closing the conference, then the runtime, frees every native resource
     }
 }
 ```
 
-`try-with-resources` is important: dropping a `Conference` or `JSyn` without `close()` leaks
-native pipelines. The Rust runtime shuts down only when the `JSyn` instance closes.
+The build compiles this code from
+[`Quickstart.java`](jsyn/src/test/java/com/synauson/jsyn/docs/Quickstart.java), and CI
+fails if this README falls out of step with it. For more, see
+[the tests that show each feature](#use-cases-shown-by-the-tests). The API reference is
+the javadoc, which is published with every release as `jsyn-<version>-javadoc.jar` (most
+IDEs attach it automatically). To build it locally, run `./gradlew :jsyn:javadoc`.
 
-### One JSyn per JVM
+## Concepts
 
-GStreamer and ONNX Runtime are process-global singletons. Construct at most **one** `JSyn`
-instance per JVM process; create it once at startup and share it across your application.
+`JSyn` is the runtime. Constructing it loads the natives, checks GStreamer, validates
+the license, and starts downloading models in the background. Create one per process and
+share it. GStreamer and ONNX Runtime are process-wide, so a second instance gains you
+nothing.
 
----
+A `Conference` holds participants. `jsyn.startConference(id)` returns one.
+`conf.add*Participant(spec)` adds a participant from a builder-made spec. `build()`
+throws `InvalidArgumentException` naming every required field you left out. Optional
+settings you leave unset take the defaults documented in the javadoc.
 
-## Participant types
-
-| Spec class | What it does | Typical use |
+| Participant | Spec | Use it for |
 |---|---|---|
-| `FileParticipantSpec` | Plays a WAV / OGG / MP3 file into the conference, or records all participants to disk | Hold music, IVR prompts, full-conference recording |
-| `RecordingParticipantSpec` | Records the conference mix to disk | Compliance recording |
-| `SipParticipantSpec` | SIP leg (RTP) whose peer media is already known | Inbound carrier calls, softphone callers |
-| `SipReservationSpec` + `SipConnectionSpec` | Two-phase SIP leg: reserve our ports for the SDP offer, connect with the answer's `SipRemoteMedia` | Outbound calls |
-| `WebRtcParticipantSpec` | WebRTC peer (SDP offer/answer, ICE) | Browser callers |
-| `NativeParticipant` | In-process bidirectional audio via `ByteBuffer` rings | Custom Java audio sources/sinks |
+| File | `FileParticipantSpec` | Playing a GStreamer URI (`file:///…`), optionally in a loop: prompts, hold music |
+| Recording | `RecordingParticipantSpec` | Writing one participant's audio to a WAV file |
+| SIP | `SipParticipantSpec`, or `SipReservationSpec` then `SipConnectionSpec` | An RTP leg with PCMU/PCMA, DTMF and optional SRTP. Use one-step add when the peer's media is known (inbound), or reserve then connect for an outbound offer/answer. |
+| WebRTC | `WebRtcParticipantSpec` | A browser peer: SDP offer in, answer out, trickle ICE |
+| Native | `NativeParticipantSpec` | Your own Java audio source and sink, through `write`/`read` on shared-memory rings |
 
-For an outbound call, `conf.reserveSipParticipant(...)` binds the RTP/RTCP ports for your SDP
-offer and starts nothing; after the answer, `conf.connectSipParticipant(...)` starts the
-participant on those ports and returns the usual `SipParticipantHandle`. `removeParticipant`
-releases a reservation that never connects.
+Routing is explicit. Adding participants connects nothing. Audio flows only along the
+one-way connections you set with `conf.updatePartyAudioConnections(new
+ConnectionMatrix(...))`, and each call replaces the whole matrix. A participant with
+nothing connected to it may carry no audio at all. That is why the detector tests
+connect a participant to itself.
 
-```java
-SipReservation r = conf.reserveSipParticipant(
-    SipReservationSpec.builder().participantId("callee").build());
-// ... send an INVITE whose SDP offer carries r.localRtpPort(), await the answer ...
-SipParticipantHandle callee = conf.connectSipParticipant(SipConnectionSpec.builder()
-    .participantId("callee")
-    .remote(SipRemoteMedia.builder()
-        .remoteIp(answerIp).remoteRtpPort(answerPort).codec("PCMU").dtmfPayloadType(101)
-        .build())
-    .build());
-```
+To run a detector, put `VadConfig` (voice activity) or `SmartTurnConfig` (end of
+turn, which needs VAD as well) on a participant's spec. Then subscribe with
+`conf.streamVadEvents(id, observer)` after adding the participant, since the detector
+belongs to it. The same pattern works for Smart Turn, file, DTMF and ICE-candidate
+events. Each `stream*` call returns a `Subscription`. Observers run on
+an engine thread, so don't block in them; `onError` and `onCompleted` have defaults.
 
-A WebRTC participant can set its own ICE port range, STUN and TURN servers, relay-only policy,
-jitter buffer and Opus encoding. Anything it leaves unset takes the runtime default from
-`JSynConfig` (`webrtcStunServer`, `webrtcJitterBufferMs`, `webrtcIcePortRange`). Unless the call
-is relayed through TURN, its media flows on a UDP port inside the ICE port range, so that range
-is what a firewall or container has to allow. `handle.stats().effectiveOptions` reports the
-options the participant runs with.
+Everything that owns native memory is `AutoCloseable`: `JSyn`, `Conference`, `Subscription` and
+`NativeParticipant`. Close them in reverse order of creation, which
+try-with-resources does for you. `close()` is idempotent, and a closed object throws
+`NativeResourceClosedException`. An object you forget to close is freed by a cleaner when
+it is garbage collected, which can be much later.
 
-```java
-WebRtcParticipantHandle caller = conf.addWebRtcParticipant(WebRtcParticipantSpec.builder()
-    .participantId("caller")
-    .sdpOffer(browserOffer)
-    .icePortRange(40000, 40099)
-    .turnServers(List.of("turn://user:password@turn.example.com:3478?transport=udp"))
-    .opusBitrate(32_000)
-    .build());
-```
+`Conference` methods are thread-safe. Each `NativeParticipant` ring has one
+producer and one consumer: at any time, at most one thread may call `write` and one may
+call `read`.
 
-Streaming subscriptions are available for VAD events, SmartTurn events, File end-of-stream events,
-DTMF events (SIP/WebRTC), and ICE candidates (WebRTC). Each subscription returns a `Subscription`
-handle — call `cancel()` to stop.
+Errors are unchecked subclasses of `JSynException`, named after the failure:
+`InvalidArgumentException`, `NotFoundException`, `AlreadyExistsException`,
+`FailedPreconditionException`, `PermissionDeniedException`, `LimitExceededException`, and
+others. The public API is `@NullMarked` (JSpecify): nothing is null unless it is marked
+`@Nullable`.
 
----
+### Licensing and models
 
-## How native loading works
+The license key comes from `JSynConfig.licenseKey`, or from `$SYNAUSON_LICENSE_KEY` when
+that is null. The engine exchanges it for a signed license, caches the license in the
+state directory, and renews it about once a day. If the licensing server is unreachable,
+the engine starts on the cached license. A capability your license lacks throws
+`PermissionDeniedException`. Going over a usage limit throws `LimitExceededException` for
+the new conference or detector; nothing already running is stopped.
+`jsyn.capabilities()` reports the license, its limits, current usage and the state of
+each model.
 
-`NativeLoader` extracts the platform `.so`/`.dll` and ONNX Runtime from the `jsyn-natives-<platform>`
-JAR into a temp directory under `java.io.tmpdir`, pre-loads ORT, then loads the JNI library. A JVM
-shutdown hook deletes the temp directory on exit.
+The models (Silero VAD, Smart Turn) download into the model store in the background.
+Adding a detector before its model is ready throws `FailedPreconditionException` naming
+the model. On a host with no internet access, set `offline(true)` and a `licenseFile`, and
+fill the store from a folder of `.onnx` files with `JSyn.importModels(from, store)`.
 
-GStreamer plugins on Windows are discovered via the `GSTREAMER_1_0_ROOT_MSVC_X86_64` environment
-variable (the system install). On Linux they are found via the standard GStreamer plugin path from
-the system install.
+The [licensing tour](https://github.com/synauson/examples/tree/main/java/jsyn-licensing)
+walks through all of this against a real free-tier license, including how to wait for
+models and what to do when a limit is hit.
 
----
+## Use cases, shown by the tests
+
+jsyn's integration tests run against the real engine on Linux and Windows on every push,
+so they are working, current examples of each feature. The helpers they share (the
+`JSynTestHelpers` factory, a loopback [RTP peer][SipRtpPeer], and a headless-Chromium
+[WebRTC peer][WebRtcBrowserPeer]) are test scaffolding. Everything else is plain jsyn
+API.
+
+| Use case | Test | What to look at |
+|---|---|---|
+| Runtime and conference lifecycle | [JSynLifecycleIT] | try-with-resources nesting, two isolated conferences, `conf.state()` |
+| Shutting down with audio in flight | [GracefulShutdownIT] | Close participant, conference and runtime while another thread writes. The writer stops on `NativeResourceClosedException`. |
+| Play a file, get playback events | [FileParticipantIT] | Build the URI with `Path.toUri()` so it is valid on Windows too, subscribe before adding, then `PlaybackStarted` and `Eos` |
+| Record a participant to WAV | [RecordingParticipantIT], [SipStartOrderE2eIT] | `sourceParticipantId` and `outputPath`; the second test records a live SIP caller |
+| Push and pull raw audio from Java | [NativeParticipantBasicIT], [NativeParticipantFormatMatrixIT] | `write`/`read`/`stats`, every `NativeAudioFormat`, and a self-connection that echoes audio back to `read` |
+| One audio thread per participant | [NativeParticipantConcurrencyIT] | Five participants written from five threads. A full ring returns 0; it does not throw. |
+| Route audio between participants | [SipMixedSourcesE2eIT], [SipReserveConnectE2eIT] | `updatePartyAudioConnections`: growing the matrix mid-call, one destination mixing a native and a SIP source, and a two-way call as two one-way entries |
+| Voice activity detection | [VadDetectorIT], [RealVadE2eLatencyIT] | `VadConfig.defaults()`, a self-connection so audio reaches the detector, then `VadEvent.SpeechStart` |
+| End-of-turn detection | [SmartTurnDetectorIT] | `SmartTurnConfig` alongside VAD, then `SmartTurnEvent.TurnResult` |
+| Model store and missing models | [ModelStoreIT] | `JSyn.importModels` is idempotent and rejects corrupt files. A missing model throws `FailedPreconditionException` and leaves nothing half-built. |
+| Inbound SIP call | [SipParticipantIT], [SipMediaE2eIT] | `addSipParticipant`, `localRtpPort()` for your SDP, real RTP both ways, VAD on a SIP caller |
+| Outbound SIP call (reserve, then connect) | [SipReserveConnectE2eIT] | Reserve the ports for the offer, connect with the answer's `SipRemoteMedia`, SRTP keys across the two phases, and releasing a reservation |
+| DTMF | [SipDtmfE2eIT], [DtmfEventsIT] | `sendDtmf` sends RFC 4733 on the wire, `streamDtmfEvents` receives, and invalid digits are rejected. [SipMixedSourcesE2eIT] also covers in-band DTMF (`dtmfPayloadType(0)`). |
+| WebRTC offer/answer | [WebRtcParticipantIT] | The smallest `addWebRtcParticipant` call and `sdpAnswer()` |
+| WebRTC with a real browser | [WebRtcMediaE2eIT] | Relay the answer and trickle ICE both ways (`streamWebRtcIceCandidates`, `addIceCandidate`), VAD on browser audio, echo back |
+| Voice agent: browser caller and Java agent | [WebRtcNativeParticipantE2eIT] | A WebRTC caller wired both ways to a `NativeParticipant`, ICE candidates handed off the engine thread, and hang-up order |
+| Per-call WebRTC options | [WebRtcOptionsE2eIT] | `icePortRange`, Opus options, `stunServer("")` to disable STUN, runtime defaults from `JSynConfig`, `stats().effectiveOptions`, rejected options |
+
+No test covers `muteParticipant`, `addPriorityAudioFiles` or `getResourceSnapshot`; see
+their javadoc. `capabilities()` is covered by the licensing tour.
+
+[JSynLifecycleIT]: jsyn/src/test/java/com/synauson/jsyn/it/JSynLifecycleIT.java
+[GracefulShutdownIT]: jsyn/src/test/java/com/synauson/jsyn/it/GracefulShutdownIT.java
+[FileParticipantIT]: jsyn/src/test/java/com/synauson/jsyn/it/FileParticipantIT.java
+[RecordingParticipantIT]: jsyn/src/test/java/com/synauson/jsyn/it/RecordingParticipantIT.java
+[SipStartOrderE2eIT]: jsyn/src/test/java/com/synauson/jsyn/it/SipStartOrderE2eIT.java
+[NativeParticipantBasicIT]: jsyn/src/test/java/com/synauson/jsyn/it/NativeParticipantBasicIT.java
+[NativeParticipantFormatMatrixIT]: jsyn/src/test/java/com/synauson/jsyn/it/NativeParticipantFormatMatrixIT.java
+[NativeParticipantConcurrencyIT]: jsyn/src/test/java/com/synauson/jsyn/it/NativeParticipantConcurrencyIT.java
+[SipMixedSourcesE2eIT]: jsyn/src/test/java/com/synauson/jsyn/it/SipMixedSourcesE2eIT.java
+[VadDetectorIT]: jsyn/src/test/java/com/synauson/jsyn/it/VadDetectorIT.java
+[RealVadE2eLatencyIT]: jsyn/src/test/java/com/synauson/jsyn/it/RealVadE2eLatencyIT.java
+[SmartTurnDetectorIT]: jsyn/src/test/java/com/synauson/jsyn/it/SmartTurnDetectorIT.java
+[ModelStoreIT]: jsyn/src/test/java/com/synauson/jsyn/it/ModelStoreIT.java
+[SipParticipantIT]: jsyn/src/test/java/com/synauson/jsyn/it/SipParticipantIT.java
+[SipMediaE2eIT]: jsyn/src/test/java/com/synauson/jsyn/it/SipMediaE2eIT.java
+[SipReserveConnectE2eIT]: jsyn/src/test/java/com/synauson/jsyn/it/SipReserveConnectE2eIT.java
+[SipDtmfE2eIT]: jsyn/src/test/java/com/synauson/jsyn/it/SipDtmfE2eIT.java
+[DtmfEventsIT]: jsyn/src/test/java/com/synauson/jsyn/it/DtmfEventsIT.java
+[WebRtcParticipantIT]: jsyn/src/test/java/com/synauson/jsyn/it/WebRtcParticipantIT.java
+[WebRtcMediaE2eIT]: jsyn/src/test/java/com/synauson/jsyn/it/WebRtcMediaE2eIT.java
+[WebRtcNativeParticipantE2eIT]: jsyn/src/test/java/com/synauson/jsyn/it/WebRtcNativeParticipantE2eIT.java
+[WebRtcOptionsE2eIT]: jsyn/src/test/java/com/synauson/jsyn/it/WebRtcOptionsE2eIT.java
+[SipRtpPeer]: jsyn/src/test/java/com/synauson/jsyn/it/support/SipRtpPeer.java
+[WebRtcBrowserPeer]: jsyn/src/test/java/com/synauson/jsyn/it/support/WebRtcBrowserPeer.java
+
+## Complete applications
+
+The tests show one feature at a time. For whole applications you can run and adapt, see
+[synauson/examples](https://github.com/synauson/examples):
+
+| Example | What it shows |
+|---|---|
+| [WebRTC testbed](https://github.com/synauson/examples/tree/main/java/jsyn-webrtc-testbed) | A Spring Boot and React app, published as a container. Browsers join a room, audio is routed through jsyn, and VAD and Smart Turn events stream live to the page. It is the reference for WebRTC signalling, one conference per room, and event fan-out. |
+| [Licensing tour](https://github.com/synauson/examples/tree/main/java/jsyn-licensing) | License keys and files, capabilities, air-gapped hosts, and what happens at a usage limit |
+| [Windows quickstart](https://github.com/synauson/examples/tree/main/java/jsyn-windows-quickstart) | A minimal Gradle project for Windows: GStreamer setup, then file playback, native audio I/O and VAD |
+
+## Configuration and logging
+
+Set runtime options on `JSynConfig.builder()`; its javadoc lists every option with its
+default. The engine also reads these environment variables:
+
+| Variable | Effect |
+|---|---|
+| `SYNAUSON_LICENSE_KEY` | The license key, used when `licenseKey` is null |
+| `SYNAUSON_MODEL_STORE` | The model store, used when `modelStore` is null. Default: `~/.cache/synauson/models` (or `$XDG_CACHE_HOME/synauson/models`), `%LOCALAPPDATA%\synauson\models` on Windows |
+| `SYNAUSON_STATE_DIR` | The state directory holding the cached license, used when `stateDir` is null. Default: `~/.local/state/synauson` (or `$XDG_STATE_HOME/synauson`), `%LOCALAPPDATA%\synauson\state` on Windows |
+| `SYNAUSON_LOG_LEVEL` | Engine log filter in `RUST_LOG` syntax, for example `info` or `debug`. Falls back to `RUST_LOG`, then `warn`. |
+| `SYNAUSON_LOG_FORMAT` | `json` writes JSON lines instead of compact text |
+
+Engine logs go to the process's stderr. The logging variables are read once, when the
+natives load, so set them before the JVM starts. In containers, put the model store and
+the state directory on volumes so that models and the license survive restarts.
 
 ## Troubleshooting
 
-| Symptom | Likely cause | Fix |
-|---|---|---|
-| `UnsatisfiedLinkError: missing native: com/synauson/jsyn/natives/...` | `jsyn-natives-<platform>` not on classpath | Add the `runtimeOnly` dependency for your OS |
-| `Can't find gstreamer-1.0-0.dll` (Windows) | GStreamer not installed or PATH not refreshed | Install per the Windows section above; reboot |
-| `FailedPreconditionException: model 'silero-vad' version 5 is not installed` (or `failed verification`) | The store lacks that model, or its file doesn't match the pinned SHA-256 | Run `JSyn.importModels(<folder with the .onnx files>, <store>)` and pass the same store to `modelStore` |
-| First `new JSyn(...)` on Windows takes tens of seconds | GStreamer is building its plugin registry | Run `gst-inspect-1.0.exe coreelements` once after install (Windows step 5) |
-| `UnsatisfiedLinkError: msvcr100.dll missing` | Old MSVC runtime missing | Install Visual C++ Redistributable for VS 2015–2022 |
+| Message or symptom | Cause and fix |
+|---|---|
+| `UnsatisfiedLinkError: missing native: com/synauson/jsyn/natives/<platform>/… — add jsyn-natives-<platform> to your classpath` | The natives jar for this OS is not on the runtime classpath. Add `jsyn-natives-linux` or `jsyn-natives-windows`. |
+| `UnsatisfiedLinkError: jsyn does not yet support OS '…'` (or `arch`) | Only Linux and Windows on x86_64 are supported. |
+| `UnsatisfiedLinkError` naming a `libgst…` library, or `gstreamer-1.0-0.dll` on Windows | GStreamer is not installed or not on the library path. See [Requirements](#requirements). On Windows, sign out and back in after changing `Path`. |
+| `InternalException: GStreamer sanity check failed: required GStreamer element '…' not found` | A plugin set is missing. `errorignore` comes from `gstreamer1.0-plugins-bad`, and the mixer and codecs from `-base` and `-good`. |
+| WebRTC participants fail while SIP and file participants work | The ICE plugin is missing (`gstreamer1.0-nice`), or GStreamer is 1.28. |
+| `InvalidArgumentException: no license key configured: set SYNAUSON_LICENSE_KEY …` | Set the variable, or pass `licenseKey(...)`. |
+| `PermissionDeniedException: license.synauson.com refused this license key: …` | The key is wrong, expired or revoked. |
+| `FailedPreconditionException: model 'silero-vad' version 5 is not installed: …` | The model hasn't downloaded yet, or the host is offline. Wait until `capabilities().models` reports it ready, or run `JSyn.importModels`. |
+| First `new JSyn(...)` on Windows takes tens of seconds | GStreamer is building its plugin registry. Run `gst-inspect-1.0.exe coreelements` once per user. |
 
-For deeper diagnostics, run with `-Djsyn.log=trace` to enable native-side tracing output on stderr.
+For more detail, rerun with `SYNAUSON_LOG_LEVEL=debug`.
 
----
+## Versions
 
-## Versioning
+`jsyn` and the `jsyn-natives-*` jars are versioned separately: the natives are built from
+the engine, and jsyn is released from this repository. Each jsyn release needs natives at
+or above the `jsynNativesVersion` in that release's
+[`gradle.properties`](gradle.properties), and CI tests it against exactly that version.
+Use that pairing. For jsyn 1.5.0 it is natives 1.5.0.
 
-jsyn version numbers match the synauson server release they were built with. Always use matching
-versions — the JNI ABI carries no stability contract across versions. Mixing `jsyn` and
-`jsyn-natives-<platform>` at different versions causes immediate `UnsatisfiedLinkError` or
-undefined behavior.
+Every push to `main` publishes a snapshot of the next minor version to
+`https://maven.synauson.com/snapshots`. Tags `v*` publish releases. In the javadoc,
+`@since` names the release that added each API.
 
-Snapshot versions (`*-SNAPSHOT`) are published on every push to `main`. Tagged releases (`v0.1.0`,
-etc.) are published on version tags.
-
----
-
-## Examples
-
-The [synauson/examples](https://github.com/synauson/examples) repository contains complete,
-runnable reference applications built with jsyn.
-
----
-
-## Building from source
+## Building and testing jsyn
 
 ```bash
-git clone https://github.com/synauson/jsyn
-cd jsyn
-./gradlew :jsyn:compileJava
+./gradlew :jsyn:compileJava :jsyn:compileTestJava :jsyn:checkReadmeSnippets  # no natives or GStreamer needed
+./gradlew :jsyn:test --tests '*Test'  # unit tests; pure Java, no license needed
 ```
 
-Running integration tests requires the native artifacts (`jsyn-natives-linux` or
-`jsyn-natives-windows`), which Gradle downloads from `https://maven.synauson.com/releases`:
-
-```bash
-./gradlew :jsyn:test
-```
-
----
+The integration tests (`*IT`, run with `./gradlew :jsyn:test`) drive the real engine.
+They need GStreamer, `SYNAUSON_LICENSE_KEY`, Playwright's Chromium
+(`./gradlew :jsyn:installPlaywrightBrowsers`), and model and speech fixtures from the
+engine's private repository, passed with `-DsynausonRepoDir=<dir>`. The runner expects
+`models/silero_vad.onnx` and `models/smart_turn_v3.onnx`, and tests that need
+`synauson-server/tests/fixtures/short_speech.wav` skip without it. Outside the Synauson
+team, rely on CI, which runs the full suite on Linux and Windows for every push.
 
 ## License
 
-Apache 2.0 — see [LICENSE](LICENSE).
+Apache 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).

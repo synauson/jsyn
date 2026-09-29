@@ -10,8 +10,10 @@ on:
 jobs:
   # -------------------------------------------------------------------------
   # Compile pure-Java sources to catch API regressions without needing the
-  # native platform JARs. Test compilation needs jsyn-natives-linux on the
-  # test classpath; it resolves from the public Synauson Maven repository.
+  # native platform JARs, and check the README's code blocks match the test
+  # sources they are copied from (checkReadmeSnippets in jsyn/build.gradle.kts).
+  # Test compilation needs jsyn-natives-linux on the test classpath; it
+  # resolves from the public Synauson Maven repository.
   # -------------------------------------------------------------------------
   java-compile:
     runs-on: gh-runner-l
@@ -34,8 +36,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      - name: compile jsyn sources and tests
-        run: ./gradlew :jsyn:compileJava :jsyn:compileTestJava --no-daemon --console=plain
+      - name: compile jsyn sources and tests, check README snippets
+        run: ./gradlew :jsyn:compileJava :jsyn:compileTestJava :jsyn:checkReadmeSnippets --no-daemon --console=plain
 
   # -------------------------------------------------------------------------
   # Run the full IT suite (VAD/SmartTurn model inference, SIP, WebRTC,
@@ -278,11 +280,11 @@ jobs:
           retention-days: 14
 
   # -------------------------------------------------------------------------
-  # Publish com.synauson:jsyn:1.5.0-SNAPSHOT (the next minor release) to the
-  # Synauson Maven repository on every push to main.
+  # Publish the snapshot version set in build.gradle.kts (the minor after the
+  # latest v* tag) to the Synauson Maven repository on every push to main.
   # This gives the examples testbed a stable, always-current snapshot to pull
   # without coordinating timestamp-based version strings across repos.
-  # PRs do not publish.
+  # Other branches do not publish.
   # -------------------------------------------------------------------------
   publish-snapshot:
     runs-on: gh-runner-l
@@ -309,7 +311,6 @@ jobs:
 
       - name: publish jsyn snapshot
         env:
-          JSYN_VERSION: 1.5.0-SNAPSHOT
           MAVEN_SNAPSHOTS_URL: ${{ secrets.MAVEN_SNAPSHOTS_URL }}
           MAVEN_USER: ${{ secrets.MAVEN_USER }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}

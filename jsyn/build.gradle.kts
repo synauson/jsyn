@@ -71,3 +71,65 @@ tasks.register<JavaExec>("installPlaywrightBrowsers") {
         listOf("install", "chromium")
     }
 }
+
+// README code blocks are copies of regions in test sources that compileTestJava
+// builds, so the README cannot show code that no longer compiles. A block is
+// "<!-- snippet: NAME -->" followed by a fenced block; its source is the lines
+// between "// snippet: NAME" and "// end snippet: NAME" in src/test/java/**/docs/.
+// Every region must appear in the README, and every README marker must have a region.
+val checkReadmeSnippets by tasks.registering {
+    group = "verification"
+    description = "Fails when a README code block differs from its source region in the test sources."
+    val readme = rootProject.file("README.md")
+    val sources = fileTree("src/test/java") { include("**/docs/*.java") }
+    inputs.file(readme)
+    inputs.files(sources)
+    doLast {
+        val regions = linkedMapOf<String, List<String>>()
+        val start = Regex("""^\s*// snippet: (\S+)\s*$""")
+        for (file in sources.files.sorted()) {
+            val lines = file.readLines()
+            lines.forEachIndexed { i, line ->
+                val name = start.find(line)?.groupValues?.get(1) ?: return@forEachIndexed
+                val end = lines.drop(i + 1).indexOfFirst { it.trim() == "// end snippet: $name" }
+                if (end < 0) throw GradleException("${file.name}: snippet '$name' has no '// end snippet: $name'")
+                val body = lines.subList(i + 1, i + 1 + end)
+                val indent = body.filter { it.isNotBlank() }.minOfOrNull { l -> l.takeWhile { it == ' ' }.length } ?: 0
+                regions[name] = body.map { it.drop(indent).trimEnd() }
+            }
+        }
+        val marker = Regex("""^<!-- snippet: (\S+) -->\s*$""")
+        val readmeLines = readme.readLines()
+        val shown = mutableSetOf<String>()
+        val problems = mutableListOf<String>()
+        readmeLines.forEachIndexed { i, line ->
+            val name = marker.find(line)?.groupValues?.get(1) ?: return@forEachIndexed
+            shown += name
+            val expected = regions[name]
+            if (expected == null) {
+                problems += "README.md:${i + 1}: no '// snippet: $name' region under src/test/java/**/docs/"
+                return@forEachIndexed
+            }
+            val open = i + 1
+            if (open >= readmeLines.size || !readmeLines[open].startsWith("```")) {
+                problems += "README.md:${i + 1}: snippet '$name' marker must be followed by a ``` fence"
+                return@forEachIndexed
+            }
+            val close = readmeLines.drop(open + 1).indexOfFirst { it.startsWith("```") }
+            val actual = if (close < 0) readmeLines.drop(open + 1) else readmeLines.subList(open + 1, open + 1 + close)
+            val a = actual.map { it.trimEnd() }
+            if (a != expected) {
+                val at = a.indices.firstOrNull { it >= expected.size || a[it] != expected[it] } ?: a.size
+                problems += "README.md:${open + 2 + at}: snippet '$name' differs from its source region" +
+                    " (README: '${a.getOrNull(at) ?: "<end>"}', source: '${expected.getOrNull(at) ?: "<end>"}')"
+            }
+        }
+        (regions.keys - shown).forEach { problems += "snippet '$it' is not shown in README.md (add '<!-- snippet: $it -->')" }
+        if (problems.isNotEmpty()) {
+            throw GradleException(problems.joinToString("\n") +
+                "\nCopy the region from the test source into README.md; the source is the one that compiles.")
+        }
+    }
+}
+
+tasks.named("check") { dependsOn(checkReadmeSnippets) }
