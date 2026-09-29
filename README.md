@@ -254,6 +254,23 @@ SipParticipantHandle callee = conf.connectSipParticipant(SipConnectionSpec.build
     .build());
 ```
 
+A WebRTC participant can set its own ICE port range, STUN and TURN servers, relay-only policy,
+jitter buffer and Opus encoding. Anything it leaves unset takes the runtime default from
+`JSynConfig` (`webrtcStunServer`, `webrtcJitterBufferMs`, `webrtcIcePortRange`). Unless the call
+is relayed through TURN, its media flows on a UDP port inside the ICE port range, so that range
+is what a firewall or container has to allow. `handle.stats().effectiveOptions` reports the
+options the participant runs with.
+
+```java
+WebRtcParticipantHandle caller = conf.addWebRtcParticipant(WebRtcParticipantSpec.builder()
+    .participantId("caller")
+    .sdpOffer(browserOffer)
+    .icePortRange(40000, 40099)
+    .turnServers(List.of("turn://user:password@turn.example.com:3478?transport=udp"))
+    .opusBitrate(32_000)
+    .build());
+```
+
 Streaming subscriptions are available for VAD events, SmartTurn events, File end-of-stream events,
 DTMF events (SIP/WebRTC), and ICE candidates (WebRTC). Each subscription returns a `Subscription`
 handle — call `cancel()` to stop.
