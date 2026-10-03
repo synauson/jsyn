@@ -100,8 +100,23 @@ package and put `<!-- snippet: <name> -->` on the line before the README's code 
 - After a release, bump the snapshot version in `build.gradle.kts` to the next minor, and
   update the README's install snippets (Gradle and Maven) and the pairing sentence under
   "Versions".
-- Publishing needs the `MAVEN_*` secrets. Without them the publish task does not exist,
-  so it cannot be run locally.
+- Publishing needs the `MAVEN_*` settings (`MAVEN_RELEASES_URL` or
+  `MAVEN_SNAPSHOTS_URL`, `MAVEN_USER`, `MAVEN_PASSWORD`). Without them the publish task
+  does not exist, so it cannot be run locally.
+
+## Keeping this file true
+
+This file (`AGENTS.md` is a link to it) and the README are what agents and users act
+on. A change is not done until both are true again, in the same commit:
+
+- Before you finish, reread the sections that cover what you changed and fix, delete or
+  add what the next agent needs. Facts about the engine belong in synauson's docs;
+  point there rather than restating them.
+- `python3 tools/check-agent-docs.py` (CI's `agent-docs` job) fails on dead paths,
+  Gradle tasks and env vars in this file. It can't tell whether a sentence is still
+  true. The script is a copy of synauson's; change it there first.
+- Subagents follow this too: list any stale sentence you couldn't fix in your report.
+  When you delegate work, put the first bullet in the prompt.
 
 ## Public repository rules
 

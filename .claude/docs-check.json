@@ -1,0 +1,7 @@
+{
+  "env_prefixes": ["SYNAUSON_", "JSYN_", "MAVEN_"],
+  "claude_md_max_lines": 200,
+  "always_loaded_max_lines": 200,
+  "env_scan": ["jsyn/src/**/*.java", "*.gradle.kts", "jsyn/*.gradle.kts"],
+  "deny_scan_extra": ["README.md"]
+}
