@@ -20,6 +20,13 @@ Without `-DsynausonRepoDir`, the tests look for a synauson checkout next to this
 `jsyn/build/model-store` and fail if that import fails. Tests that need
 `synauson-server/tests/fixtures/short_speech.wav` skip without it.
 
+Model files aren't in synauson's git, so fill the checkout's `models/` first:
+`<checkout>/tools/models-fetch/fetch-models.sh <checkout>/models` (POSIX sh and curl
+7.75+; Git Bash on Windows). It downloads from a private bucket and needs
+`SYNAUSON_MODELS_ACCESS_KEY_ID` and `SYNAUSON_MODELS_SECRET_ACCESS_KEY`, a read-only key
+a maintainer hands out. CI runs it with those repository secrets right after it checks
+out synauson.
+
 `-PjsynNativesVersion=<v>` overrides the natives version for one run.
 
 ## Writing tests
