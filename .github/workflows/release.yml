@@ -12,7 +12,7 @@ jobs:
   # var read by build.gradle.kts; without MAVEN_RELEASES_URL the publish fails.
   # -------------------------------------------------------------------------
   publish:
-    runs-on: [self-hosted, Linux, X64, synauson]
+    runs-on: gh-runner-l
     steps:
       - uses: actions/checkout@v4
 
