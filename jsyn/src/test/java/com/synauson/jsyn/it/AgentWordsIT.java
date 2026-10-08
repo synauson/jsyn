@@ -1,9 +1,7 @@
 package com.synauson.jsyn.it;
 
-import com.synauson.jsyn.Capabilities;
 import com.synauson.jsyn.EventStreamObserver;
 import com.synauson.jsyn.JSyn;
-import com.synauson.jsyn.JSynConfig;
 import com.synauson.jsyn.NativeAudioFormat;
 import com.synauson.jsyn.Subscription;
 import com.synauson.jsyn.event.AgentEvent;
@@ -20,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
@@ -53,29 +52,6 @@ class AgentWordsIT {
         }
     }
 
-    /** A runtime with STT on: one worker, so no calibration run. */
-    private static JSyn newJSynWithStt() {
-        int rtpMin = JSynTestHelpers.nextRtpPortMin();
-        return new JSyn(JSynConfig.builder()
-            .modelStore(JSynTestHelpers.modelStore().toString())
-            .rtpPortMin(rtpMin)
-            .rtpPortMax(rtpMin + 199)
-            .sttCapacity(1, 2, 1)
-            .build());
-    }
-
-    /** Wait for the STT pool to load; skip when this runtime can't run STT. */
-    private static void awaitStt(JSyn syn) throws InterruptedException {
-        for (int i = 0; i < 600; i++) {
-            Capabilities.SttCapacity stt = syn.capabilities().stt;
-            assumeTrue(stt != null, "native runtime predates STT");
-            if ("ready".equals(stt.state)) return;
-            assumeTrue(!"idle".equals(stt.state), "STT not available: " + stt.detail);
-            Thread.sleep(100);
-        }
-        fail("STT did not load within 60 s");
-    }
-
     @Test
     void withSttTurnsCarryTheirWords() throws Exception {
         Path speechWav = JSynTestHelpers.resolveSynausonRepo()
@@ -86,10 +62,11 @@ class AgentWordsIT {
         long ts = System.nanoTime();
         String pid = "words-p-" + ts;
 
-        try (JSyn syn = newJSynWithStt();
+        try (JSyn syn = JSynTestHelpers.newJSynWithStt();
              Conference conf = syn.startConference("words-it-" + ts)) {
+            assumeTrue(syn.capabilities().stt != null, "native runtime predates STT");
             // Exiting while the STT pool loads can crash the runtime: wait for it.
-            awaitStt(syn);
+            JSynTestHelpers.awaitSttReady(syn, Duration.ofSeconds(120));
             // Threshold 0: every pause ends a turn.
             NativeParticipant p = conf.addNativeParticipant(pid, NativeParticipantSpec.builder()
                 .format(NativeAudioFormat.PCM_S16LE16K_MONO)
