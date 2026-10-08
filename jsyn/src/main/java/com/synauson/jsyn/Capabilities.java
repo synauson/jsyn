@@ -5,9 +5,9 @@ import java.util.List;
 import org.jspecify.annotations.Nullable;
 
 /**
- * What this runtime may use right now, and how much of it is in use: the license,
- * its usage limits and current usage, which AI capabilities it includes, and the state
- * of each model.
+ * What this runtime may use right now, and how much of it is in use: the license with
+ * its plan and standing, the pool of concurrent AI sessions, which AI capabilities the
+ * plan includes, and the state of each model.
  *
  * <p>Deserialized from the JSON returned by {@code NativeBridge.capabilities}; field
  * names match the Rust {@code CapabilitiesReport} (camelCase).
@@ -24,16 +24,31 @@ public final class Capabilities {
      */
     public final String limitsScope;
 
-    /** Fraction above each limit still admitted, reported as overage (0.25 = 125%). */
+    /**
+     * Fraction above the session limit still admitted as a burst, reported as overage
+     * (0.25 admits up to 125%).
+     */
     public final double overdraft;
 
-    /** Concurrent conferences. */
-    public final Usage conferences;
+    /**
+     * Concurrent conferences under the license. {@code null} from natives with the
+     * session pool: licenses no longer limit conferences.
+     *
+     * @deprecated read {@link #sessions}.
+     */
+    @Deprecated
+    public final @Nullable Usage conferences;
 
-    /** Concurrent conferences with at least one AI capability in use. */
-    public final Usage aiConferences;
+    /**
+     * Concurrent conferences using AI under the license. {@code null} from natives
+     * with the session pool.
+     *
+     * @deprecated read {@link #sessions}.
+     */
+    @Deprecated
+    public final @Nullable Usage aiConferences;
 
-    /** Each AI capability, whether the license includes it, and its stream usage. */
+    /** Each AI capability, and whether the license's plan includes it. */
     public final List<CapabilityInfo> capabilities;
 
     /** Each model this runtime knows, and whether it is ready to use. */
@@ -46,6 +61,14 @@ public final class Capabilities {
      */
     public final @Nullable SttCapacity stt;
 
+    /**
+     * The license's pool of concurrent AI sessions: each participant with any detector
+     * takes one. {@code null} from natives older than the session pool.
+     *
+     * @since 1.6.0
+     */
+    public final @Nullable Sessions sessions;
+
     private Capabilities() {
         this.license = null;
         this.limitsScope = null;
@@ -55,6 +78,7 @@ public final class Capabilities {
         this.capabilities = null;
         this.models = null;
         this.stt = null;
+        this.sessions = null;
     }
 
     /**
@@ -74,8 +98,14 @@ public final class Capabilities {
      */
     public static final class LicenseInfo {
         /**
-         * {@code "licensed"}, {@code "free-tier-floor"} (no current license file, for
-         * example while the licensing server is unreachable), or {@code "rejected"}.
+         * The license's standing: {@code "valid"}; {@code "expiring"} (within 30 days of
+         * its expiry); {@code "grace"} (expired, full function for 14 days);
+         * {@code "expired-floor"} (past its grace: new AI work at the free floor);
+         * {@code "invalid-kept-last-valid"} (a renewal brought a license the engine
+         * refused, and the last valid one stays in force); {@code "free-floor"} (no
+         * license file, for example while the licensing server is unreachable); or
+         * {@code "rejected"}. Natives older than the session pool report
+         * {@code "licensed"} or {@code "free-tier-floor"} instead of the first six.
          */
         public final String state;
         /** One line describing the license and its state. */
@@ -90,6 +120,26 @@ public final class Capabilities {
         public final @Nullable String fileExpiry;
         /** RFC 3339; the license's own expiry, if it has one. */
         public final @Nullable String licenseExpiry;
+        /**
+         * What new work may use now: {@code "none"}, {@code "detect"} (VAD and turn
+         * detection) or {@code "speech"} (adds STT). {@code null} from older natives.
+         *
+         * @since 1.6.0
+         */
+        public final @Nullable String plan;
+        /**
+         * Whole days until the license expires, or, in {@code "grace"}, until its grace
+         * ends. {@code null} without an expiry, at a floor, or from older natives.
+         *
+         * @since 1.6.0
+         */
+        public final @Nullable Long daysRemaining;
+        /**
+         * What needs attention: why a renewal was refused, or why the floor applies.
+         *
+         * @since 1.6.0
+         */
+        public final @Nullable String problem;
 
         private LicenseInfo() {
             this.state = null;
@@ -99,6 +149,42 @@ public final class Capabilities {
             this.source = null;
             this.fileExpiry = null;
             this.licenseExpiry = null;
+            this.plan = null;
+            this.daysRemaining = null;
+            this.problem = null;
+        }
+    }
+
+    /**
+     * The pool of concurrent AI sessions on this runtime.
+     *
+     * @since 1.6.0
+     */
+    public static final class Sessions {
+        /** The license's limit; {@code null} is unlimited. */
+        public final @Nullable Integer limit;
+        /** Sessions in use. */
+        public final int inUse;
+        /** The most admitted at once with the {@link #overdraft} burst; {@code null} when unlimited. */
+        public final @Nullable Integer ceiling;
+        /**
+         * {@code "ok"}; {@code "near-limit"} (from 80% of the limit); {@code "overage"}
+         * (above it, within the burst); or {@code "full"} (a new participant with a
+         * detector throws {@code LimitExceededException}).
+         */
+        public final String level;
+        /** The most sessions at once since this runtime started. */
+        public final int peak;
+        /** RFC 3339; when {@link #peak} was first reached. */
+        public final @Nullable String peakAt;
+
+        private Sessions() {
+            this.limit = null;
+            this.inUse = 0;
+            this.ceiling = null;
+            this.level = null;
+            this.peak = 0;
+            this.peakAt = null;
         }
     }
 
@@ -128,21 +214,22 @@ public final class Capabilities {
         /** Entitlement code, e.g. {@code FEATURE_TURN_DETECTION}. */
         public final String code;
         /**
-         * Whether the license includes it, itself or through an entitlement that includes
-         * it: {@code FEATURE_STT} includes turn detection, which includes VAD.
+         * Whether the license's plan includes it, itself or through an entitlement that
+         * includes it: {@code FEATURE_STT} includes turn detection, which includes VAD.
          */
         public final boolean entitled;
         /**
-         * Concurrent streams counted against it: one per participant whose highest
-         * detector it grants. The detectors below that one are included and count nothing.
+         * Streams counted against it. {@code null} from natives with the session pool.
+         *
+         * @deprecated read {@link Capabilities#sessions}.
          */
-        public final Usage streams;
+        @Deprecated
+        public final @Nullable Usage streams;
         /**
          * The entitlement code that grants this capability when the license doesn't name
          * it itself, e.g. {@code FEATURE_STT} for turn detection under a license with only
-         * {@code FEATURE_STT}. Streams of this capability then count against that one.
-         * {@code null} when the license names it, doesn't include it, or the natives
-         * predate inclusion.
+         * {@code FEATURE_STT}. {@code null} when the license names it, doesn't include it,
+         * or the natives predate inclusion.
          *
          * @since 1.6.0
          */
@@ -185,8 +272,8 @@ public final class Capabilities {
     /**
      * STT's decoding pool, and how many STT streams this machine transcribes in real
      * time: measured when the pool starts (a timed decode, and the memory one worker's
-     * model copy takes), or set with {@link JSynConfig.Builder#sttCapacity}. The
-     * license's {@code FEATURE_STT} stream limit applies on top.
+     * model copy takes), or set with {@link JSynConfig.Builder#sttCapacity}. Each STT
+     * participant also takes a license session.
      *
      * @since 1.6.0
      */

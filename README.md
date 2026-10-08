@@ -389,19 +389,29 @@ public class AgentStreamReader implements EventStreamObserver<AgentEvent> {
 The license key comes from `JSynConfig.licenseKey`, or from `$SYNAUSON_LICENSE_KEY` when
 that is null. The engine exchanges it for a signed license, caches the license in the
 state directory, and renews it about once a day. If the licensing server is unreachable,
-the engine starts on the cached license. A capability your license lacks throws
-`PermissionDeniedException`. Going over a usage limit throws `LimitExceededException` for
-the new conference or detector; nothing already running is stopped.
-`jsyn.capabilities()` reports the license, its limits, current usage and the state of
-each model.
+the engine starts on the cached license, or else on the free floor.
 
-Entitlements follow the detector chain: each includes the ones below it.
-`FEATURE_TURN_DETECTION` also runs VAD, and `FEATURE_STT` also runs turn detection and VAD.
-A participant counts one stream, for its highest detector: STT with its turn detection and
-VAD counts one `FEATURE_STT` stream. A capability your license grants only through a
-higher one reports `entitled` with `includedBy` naming that code, and its streams count
-against that code: under a license with only `FEATURE_TURN_DETECTION`, VAD on its own
-counts a `FEATURE_TURN_DETECTION` stream.
+A license has a **plan** and one number. The plan says what new work may use, and each
+plan includes everything in the one below it: `detect` runs VAD and turn detection, `speech`
+adds STT. The number is how many **AI sessions** may run at once: a participant with any
+detector takes one session, whatever detectors it has, and conferences and participants
+without detectors take none.
+
+- A detector the plan lacks throws `PermissionDeniedException` naming its entitlement
+  code (`FEATURE_VAD`, `FEATURE_TURN_DETECTION`, `FEATURE_STT`).
+- From 80% of the session limit the engine logs a warning for each new session. Above
+  the limit, a burst (25% unless the license sets another) is still admitted and logged
+  as overage. Past the burst, adding a participant with a detector throws
+  `LimitExceededException`. Nothing already running is ever stopped.
+- About 30 days before the license expires the engine logs a daily warning. After it
+  expires, everything keeps working for 14 days of grace; then new AI work falls to the
+  free floor (`detect`, 4 sessions). Calls in progress continue.
+
+`jsyn.capabilities()` reports all of it: `license.state` (the standing: `valid`,
+`expiring`, `grace`, `expired-floor`, `invalid-kept-last-valid`, `free-floor` or
+`rejected`), `license.plan`, `license.daysRemaining` and `license.problem`; `sessions`
+(limit, in use, the burst's `ceiling`, a `level` from `ok` to `full`, and the peak since
+start); each capability with `entitled` and `includedBy`; and the state of each model.
 
 The models (sentito-1, turn detection) download into the model store in the background.
 Adding a detector before its model is ready throws `FailedPreconditionException` naming
@@ -409,8 +419,8 @@ the model. On a host with no internet access, set `offline(true)` and a `license
 fill the store from a folder of `.onnx` files with `JSyn.importModels(from, store)`.
 
 The [licensing tour](https://github.com/synauson/examples/tree/main/java/jsyn-licensing)
-walks through all of this against a real free-tier license, including how to wait for
-models and what to do when a limit is hit.
+walks through all of this against a real free license, including how to wait for models
+and what to do when a limit is hit.
 
 ## Use cases, shown by the tests
 
@@ -519,7 +529,9 @@ the state directory on volumes so that models and the license survive restarts.
 | Adding a SIP participant throws `InternalException` naming `dtmfdetect` | GStreamer lacks its spandsp plugin, as on RHEL. Use a [supported distribution](docs/install.md#supported-distributions). |
 | WebRTC participants fail while SIP and file participants work | The ICE plugin is missing (`gstreamer1.0-nice`), or GStreamer is 1.28. |
 | `InvalidArgumentException: no license key configured: set SYNAUSON_LICENSE_KEY …` | Set the variable, or pass `licenseKey(...)`. |
-| `PermissionDeniedException: license.synauson.com refused this license key: …` | The key is wrong, expired or revoked. |
+| `PermissionDeniedException: license.synauson.com refused this license key: …` | The key is wrong, suspended or revoked. An expired license is not refused: see [Licensing and models](#licensing-and-models). |
+| `FailedPreconditionException: ILLEGAL_LICENSE: … is not a valid synauson license: …` from `new JSyn(...)` | The license itself doesn't fit this engine (the message lists every problem, for example a missing session limit or an entitlement set that is no plan). No setting fixes it: send the message to Synauson for a corrected license. |
+| `LimitExceededException: concurrent AI session limit reached: …` | Every AI session the license allows, and its burst, is in use. Remove a participant with detectors, or ask Synauson for more sessions. `capabilities().sessions` shows the limit, use and peak. |
 | `InvalidArgumentException: turn_detection needs vad on the same participant: …` (or `stt needs turn_detection …`) | Each detector needs the one before it on the same participant. Add the `VadConfig` (or `TurnDetectionConfig`) it names. Older natives accepted turn detection without VAD, which then never ran. |
 | `FailedPreconditionException: model 'sentito-1' version 5 is not installed: …` | The model hasn't downloaded yet, or the host is offline. Wait until `capabilities().models` reports it ready, or run `JSyn.importModels`. |
 | First `new JSyn(...)` on Windows takes tens of seconds | GStreamer is building its plugin registry. Run `gst-inspect-1.0.exe coreelements` once per user. |

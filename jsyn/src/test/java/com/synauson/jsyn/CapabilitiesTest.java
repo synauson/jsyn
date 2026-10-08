@@ -6,42 +6,59 @@ import static org.junit.jupiter.api.Assertions.*;
 class CapabilitiesTest {
     // The shape the native CapabilitiesReport serializes to (serde, camelCase).
     private static final String JSON = "{"
-        + "\"license\":{\"state\":\"licensed\",\"description\":\"license 'free' (Server, file valid until 2026-10-27 16:25 UTC)\","
-        + "\"licenseId\":\"f5544dce\",\"name\":\"free\",\"source\":\"server\","
-        + "\"fileExpiry\":\"2026-10-27T16:25:22.204+00:00\",\"licenseExpiry\":null},"
+        + "\"license\":{\"state\":\"expiring\",\"description\":\"license 'acme' expires 2026-11-01\","
+        + "\"licenseId\":\"f5544dce\",\"name\":\"acme\",\"source\":\"server\","
+        + "\"fileExpiry\":\"2026-10-27T16:25:22.204+00:00\",\"licenseExpiry\":\"2026-11-01T12:00:00+00:00\","
+        + "\"plan\":\"speech\",\"daysRemaining\":27,\"problem\":null},"
         + "\"limitsScope\":\"this instance\",\"overdraft\":0.25,"
-        + "\"conferences\":{\"limit\":10,\"inUse\":3},"
-        + "\"aiConferences\":{\"limit\":2,\"inUse\":1},"
         + "\"capabilities\":["
-        + "{\"code\":\"FEATURE_VAD\",\"entitled\":true,\"streams\":{\"limit\":null,\"inUse\":0},"
-        + "\"includedBy\":\"FEATURE_TURN_DETECTION\"},"
-        + "{\"code\":\"FEATURE_TURN_DETECTION\",\"entitled\":true,\"streams\":{\"limit\":4,\"inUse\":2},"
-        + "\"includedBy\":null}],"
+        + "{\"code\":\"FEATURE_VAD\",\"entitled\":true,\"includedBy\":\"FEATURE_TURN_DETECTION\"},"
+        + "{\"code\":\"FEATURE_TURN_DETECTION\",\"entitled\":true,\"includedBy\":null}],"
         + "\"models\":["
         + "{\"id\":\"sentito-1\",\"version\":\"5\",\"release\":\"5.0.0\",\"state\":\"ready\",\"detail\":null},"
         + "{\"id\":\"fermata-1\",\"version\":\"1.0.0-cpu\",\"release\":\"1.0.0\",\"state\":\"missing\",\"detail\":\"not installed\"}],"
         + "\"stt\":{\"state\":\"ready\",\"calibrated\":true,\"workers\":3,\"threadsPerWorker\":5,"
         + "\"realTimeFactor\":0.79,\"modelBytes\":1189294080,\"limitedBy\":\"cpu\","
         + "\"streams\":{\"limit\":3,\"inUse\":1},\"detail\":null,"
-        + "\"turnFlush\":true,\"forecastReserve\":0.384}"
+        + "\"turnFlush\":true,\"forecastReserve\":0.384},"
+        + "\"sessions\":{\"limit\":20,\"inUse\":17,\"ceiling\":25,\"level\":\"near-limit\","
+        + "\"peak\":19,\"peakAt\":\"2026-10-04T09:12:00+00:00\"}"
+        + "}";
+
+    // What natives before the session pool sent.
+    private static final String OLDER = "{"
+        + "\"license\":{\"state\":\"licensed\",\"description\":\"license 'free'\","
+        + "\"licenseId\":\"f5544dce\",\"name\":\"free\",\"source\":\"server\","
+        + "\"fileExpiry\":\"2026-10-27T16:25:22.204+00:00\",\"licenseExpiry\":null},"
+        + "\"limitsScope\":\"this instance\",\"overdraft\":0.25,"
+        + "\"conferences\":{\"limit\":10,\"inUse\":3},"
+        + "\"aiConferences\":{\"limit\":2,\"inUse\":1},"
+        + "\"capabilities\":["
+        + "{\"code\":\"FEATURE_VAD\",\"entitled\":true,\"streams\":{\"limit\":null,\"inUse\":0}}],"
+        + "\"models\":[]"
         + "}";
 
     @Test
     void readsTheNativeReport() {
         Capabilities c = Capabilities.fromJson(JSON);
-        assertEquals("licensed", c.license.state);
-        assertEquals("free", c.license.name);
-        assertNull(c.license.licenseExpiry);
+        assertEquals("expiring", c.license.state);
+        assertEquals("acme", c.license.name);
+        assertEquals("speech", c.license.plan);
+        assertEquals(Long.valueOf(27), c.license.daysRemaining);
+        assertNull(c.license.problem);
         assertEquals("this instance", c.limitsScope);
         assertEquals(0.25, c.overdraft);
-        assertEquals(Integer.valueOf(10), c.conferences.limit);
-        assertEquals(3, c.conferences.inUse);
-        assertEquals(1, c.aiConferences.inUse);
+
+        assertNotNull(c.sessions);
+        assertEquals(Integer.valueOf(20), c.sessions.limit);
+        assertEquals(17, c.sessions.inUse);
+        assertEquals(Integer.valueOf(25), c.sessions.ceiling);
+        assertEquals("near-limit", c.sessions.level);
+        assertEquals(19, c.sessions.peak);
+        assertEquals("2026-10-04T09:12:00+00:00", c.sessions.peakAt);
 
         assertEquals(2, c.capabilities.size());
-        assertNull(c.capabilities.get(0).streams.limit, "null is unlimited");
         assertEquals("FEATURE_TURN_DETECTION", c.capabilities.get(1).code);
-        assertEquals(2, c.capabilities.get(1).streams.inUse);
         assertEquals("FEATURE_TURN_DETECTION", c.capabilities.get(0).includedBy);
         assertNull(c.capabilities.get(1).includedBy);
 
@@ -65,6 +82,28 @@ class CapabilitiesTest {
     }
 
     @Test
+    @SuppressWarnings("deprecation")
+    void theSessionPoolReplacesTheOldLimits() {
+        Capabilities c = Capabilities.fromJson(JSON);
+        assertNull(c.conferences);
+        assertNull(c.aiConferences);
+        assertNull(c.capabilities.get(0).streams);
+    }
+
+    @Test
+    @SuppressWarnings("deprecation")
+    void nativesOlderThanTheSessionPoolReportTheOldLimits() {
+        Capabilities c = Capabilities.fromJson(OLDER);
+        assertEquals("licensed", c.license.state);
+        assertNull(c.license.plan);
+        assertNull(c.license.daysRemaining);
+        assertNull(c.sessions);
+        assertEquals(Integer.valueOf(10), c.conferences.limit);
+        assertEquals(1, c.aiConferences.inUse);
+        assertNull(c.capabilities.get(0).streams.limit, "null is unlimited");
+    }
+
+    @Test
     void nativesOlderThanTheTurnFlushReportNeither() {
         String older = JSON.replace(",\"turnFlush\":true,\"forecastReserve\":0.384", "");
         Capabilities c = Capabilities.fromJson(older);
@@ -84,7 +123,7 @@ class CapabilitiesTest {
 
     @Test
     void nativesOlderThanSttReportNoCapacity() {
-        String older = JSON.substring(0, JSON.indexOf(",\"stt\"")) + "}";
+        String older = OLDER;
         assertNull(Capabilities.fromJson(older).stt);
     }
 }

@@ -60,7 +60,7 @@ public final class JSynConfig {
 
     /**
      * Never contact {@code license.synauson.com}: use {@link #licenseFile} or the cached
-     * license file, else free-tier limits.
+     * license file, else the free floor.
      *
      * @since 1.4.0
      */
