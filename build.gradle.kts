@@ -1,7 +1,9 @@
 
 allprojects {
     group = "com.synauson"
-    version = (System.getenv("JSYN_VERSION") ?: "1.5.0-SNAPSHOT").removePrefix("v")
+    // A v* tag sets JSYN_VERSION (release.yml). Otherwise this is the snapshot
+    // main publishes: the minor after the latest tag. Bump it after each release.
+    version = (System.getenv("JSYN_VERSION") ?: "1.6.0-SNAPSHOT").removePrefix("v")
     repositories {
         mavenCentral()
         // jsyn-natives-linux and jsyn-natives-windows are published to the public
