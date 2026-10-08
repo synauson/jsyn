@@ -11,14 +11,8 @@ Each model's license notice ships inside its download, not in this repository.
 
 ## Code and data in the natives jars
 
-### spaCy
-
-- **License:** MIT
-- **Source:** https://github.com/explosion/spaCy (3.8)
-- **Attribution:** Copyright (C) 2016-2024 ExplosionAI GmbH, 2016 spaCy GmbH,
-  2015 Matthew Honnibal.
-- **Notes:** the English tokenizer's special cases, exported from spaCy, are
-  compiled into the natives, and the engine's tokenizer ports spaCy's affix rules.
+The `jsyn-natives-*` jars carry their own notice, `META-INF/NOTICE` inside each jar, for
+the code and data compiled into the natives. Its terms apply to them.
 
 ## Bundled native libraries
 
