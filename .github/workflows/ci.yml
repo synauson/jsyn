@@ -144,7 +144,7 @@ jobs:
   # the runtime to exist so the pre-built native library can load.
   # -------------------------------------------------------------------------
   test-windows:
-    runs-on: [self-hosted, Windows, X64, synauson]
+    runs-on: gh-runner-w
     needs: java-compile
     timeout-minutes: 45
     env:
