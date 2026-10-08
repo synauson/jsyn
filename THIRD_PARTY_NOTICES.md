@@ -19,3 +19,12 @@ Each model's license notice ships inside its download, not in this repository.
   2015 Matthew Honnibal.
 - **Notes:** the English tokenizer's special cases, exported from spaCy, are
   compiled into the natives, and the engine's tokenizer ports spaCy's affix rules.
+
+## Bundled native libraries
+
+### ONNX Runtime
+
+- **Files:** `libonnxruntime.so` / `onnxruntime.dll` (in the natives jars)
+- **License:** MIT
+- **Source:** https://github.com/microsoft/onnxruntime
+- **Attribution:** Copyright (c) Microsoft Corporation.
