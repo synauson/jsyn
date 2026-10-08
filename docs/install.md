@@ -228,7 +228,10 @@ memory one worker's model copy takes) and sets the pool and its stream cap from 
 `realTimeFactor` one stream's decode time over audio time, and `limitedBy` whether CPU
 or memory set it. The measurement is of one stream alone, so on a shared or busy host
 it can be optimistic. `JSynConfig.Builder.sttCapacity(workers, threads, maxStreams)`
-overrides it, and the license's `FEATURE_STT` limit applies on top.
+overrides it, and the license's `FEATURE_STT` limit applies on top. The pool sizes
+itself from the runtime's CPU budget, a container's or service's CPU quota and cpuset
+rather than the host's CPU count (`capabilities().resources`); `cpuBudget` and
+`memoryBudget` set it by hand.
 
 ## NVIDIA GPUs
 

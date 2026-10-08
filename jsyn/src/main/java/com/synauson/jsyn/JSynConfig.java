@@ -127,6 +127,21 @@ public final class JSynConfig {
     public final @Nullable Integer maxSttStreams;
 
     /**
+     * Cores this runtime may use. {@code null}: detected. See {@link Builder#cpuBudget}.
+     *
+     * @since 1.6.0
+     */
+    public final @Nullable Double cpuBudget;
+
+    /**
+     * Bytes of memory this runtime may use. {@code null}: the cgroup's limit, if any. See
+     * {@link Builder#memoryBudget}.
+     *
+     * @since 1.6.0
+     */
+    public final @Nullable Long memoryBudget;
+
+    /**
      * Close turns early on forecasts of their last words. {@code null}: the engine
      * default, off. See {@link Builder#sttTurnFlush}.
      *
@@ -152,6 +167,8 @@ public final class JSynConfig {
         this.sttWorkers = b.sttWorkers;
         this.sttThreads = b.sttThreads;
         this.maxSttStreams = b.maxSttStreams;
+        this.cpuBudget = b.cpuBudget;
+        this.memoryBudget = b.memoryBudget;
         this.sttTurnFlush = b.sttTurnFlush;
     }
 
@@ -198,6 +215,8 @@ public final class JSynConfig {
         private @Nullable Integer sttWorkers;
         private @Nullable Integer sttThreads;
         private @Nullable Integer maxSttStreams;
+        private @Nullable Double cpuBudget;
+        private @Nullable Long memoryBudget;
         private @Nullable Boolean sttTurnFlush;
 
         /**
@@ -215,6 +234,36 @@ public final class JSynConfig {
             this.sttWorkers = workers;
             this.sttThreads = threads;
             this.maxSttStreams = maxStreams;
+            return this;
+        }
+
+        /**
+         * Cores this runtime may use, fractional allowed. By default the engine detects it:
+         * the smallest of the process's cgroup CPU quota, its cpuset, the affinity mask and
+         * the CPU count, so a container or a CPU-limited service sizes itself to its quota.
+         * Set it to share one host between several runtimes without quotas. A value below
+         * the detected budget wins; one above it is used and logged as a warning.
+         * {@link Capabilities.Resources} reports the result. Natives without it ignore it.
+         *
+         * @param cores cores, more than 0, or {@code null} to detect
+         * @return this builder
+         * @since 1.6.0
+         */
+        public Builder cpuBudget(@Nullable Double cores) {
+            this.cpuBudget = cores;
+            return this;
+        }
+
+        /**
+         * Bytes of memory this runtime may use; STT sizes its workers within it. By default
+         * the engine reads the process's cgroup limit, if any.
+         *
+         * @param bytes bytes, more than 0, or {@code null} for the cgroup's limit
+         * @return this builder
+         * @since 1.6.0
+         */
+        public Builder memoryBudget(@Nullable Long bytes) {
+            this.memoryBudget = bytes;
             return this;
         }
 

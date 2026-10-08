@@ -69,6 +69,14 @@ public final class Capabilities {
      */
     public final @Nullable Sessions sessions;
 
+    /**
+     * What this runtime may use, detected at startup: its CPU budget, cores, CPU
+     * features and memory limit. {@code null} from natives without it.
+     *
+     * @since 1.6.0
+     */
+    public final @Nullable Resources resources;
+
     private Capabilities() {
         this.license = null;
         this.limitsScope = null;
@@ -79,6 +87,7 @@ public final class Capabilities {
         this.models = null;
         this.stt = null;
         this.sessions = null;
+        this.resources = null;
     }
 
     /**
@@ -185,6 +194,61 @@ public final class Capabilities {
             this.level = null;
             this.peak = 0;
             this.peakAt = null;
+        }
+    }
+
+    /**
+     * The resources the runtime sized its model pools by. Several runtimes on one host
+     * (containers, JVMs) each size themselves to their own CPU quota or cpuset, not to
+     * the host's CPU count; set {@link JSynConfig.Builder#cpuBudget} to give one a share.
+     *
+     * @since 1.6.0
+     */
+    public static final class Resources {
+        /** Cores this runtime may use; fractional under a CPU quota. */
+        public final double cpuBudget;
+        /** {@code "auto"} (detected) or {@code "override"} ({@link JSynConfig.Builder#cpuBudget}). */
+        public final String cpuSource;
+        /**
+         * What set the budget: {@code "cpu_max"} (a cgroup CPU quota), {@code "cpuset"},
+         * {@code "affinity"}, {@code "std_parallelism"} (the CPU count) or
+         * {@code "override"}.
+         */
+        public final String limitedBy;
+        /** Whole cores the model pools size by: the budget rounded down, at least 1. */
+        public final int cores;
+        /** Logical CPUs the operating system reports. */
+        public final int logicalCpus;
+        /** Physical cores among the CPUs the runtime may use; {@code null} where unknown. */
+        public final @Nullable Integer physicalCores;
+        /** Performance CPUs on a hybrid part; {@code null} with one core type. */
+        public final @Nullable Integer performanceCpus;
+        /** The CPU's model name. */
+        public final String cpuModel;
+        /**
+         * Instruction set extensions the inference runtime picks kernels by:
+         * {@code avx2}, {@code avx512f}, {@code avx512vnni}, {@code avxvnni},
+         * {@code amx_tile}, {@code amx_int8}; on ARM64 {@code dotprod}, {@code i8mm},
+         * {@code bf16}.
+         */
+        public final List<String> cpuFlags;
+        /** The memory limit in bytes (a cgroup's, or {@link JSynConfig.Builder#memoryBudget}); {@code null} with neither. */
+        public final @Nullable Long memoryLimitBytes;
+        /** {@code "auto"} or {@code "override"}. */
+        public final String memorySource;
+
+        private Resources() {
+            this.cpuBudget = 0;
+            this.cpuSource = null;
+            this.limitedBy = null;
+            this.cores = 0;
+            this.logicalCpus = 0;
+            this.physicalCores = null;
+            this.performanceCpus = null;
+            this.cpuModel = null;
+            this.cpuFlags = null;
+            this.memoryLimitBytes = null;
+            this.memorySource = null;
         }
     }
 

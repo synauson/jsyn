@@ -609,6 +609,8 @@ default. The STT options:
 | Option | Default | Effect |
 |---|---|---|
 | `sttCapacity(workers, threads, maxStreams)` | measured at startup | The STT pool's workers, ONNX Runtime threads per worker, and stream cap; `maxStreams` 0 turns STT off. Each `null` keeps the measured value. |
+| `cpuBudget(Double)` | detected | Cores this runtime may use, fractional allowed. Detected as the smallest of the process's cgroup CPU quota, cpuset, affinity mask and CPU count, so a container or CPU-limited service sizes its model pools to its quota; set it to share a host between runtimes without quotas. `capabilities().resources` reports what was used and why |
+| `memoryBudget(Long)` | the cgroup's limit | Bytes of memory this runtime may use; STT sizes its workers within it |
 | `sttTurnFlush(Boolean)` | off | Close each turn's transcript on a forecast of its last words as soon as turn detection ends the turn, rather than waiting for the transcription to get there. On a Ryzen 7 3700X it closed long turns about 130 ms sooner for about 26% more CPU, and the decoding it sets aside lowers the STT stream cap by about a quarter. `capabilities().stt.turnFlush` and `forecastReserve` report it. Natives that predate it ignore it. |
 
 The engine also reads these environment variables:

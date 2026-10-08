@@ -22,7 +22,12 @@ class CapabilitiesTest {
         + "\"streams\":{\"limit\":3,\"inUse\":1},\"detail\":null,"
         + "\"turnFlush\":true,\"forecastReserve\":0.384},"
         + "\"sessions\":{\"limit\":20,\"inUse\":17,\"ceiling\":25,\"level\":\"near-limit\","
-        + "\"peak\":19,\"peakAt\":\"2026-10-04T09:12:00+00:00\"}"
+        + "\"peak\":19,\"peakAt\":\"2026-10-04T09:12:00+00:00\"},"
+        + "\"resources\":{\"cpuBudget\":1.5,\"cpuSource\":\"auto\",\"limitedBy\":\"cpu_max\","
+        + "\"cores\":1,\"logicalCpus\":8,\"physicalCores\":4,\"performanceCpus\":null,"
+        + "\"cpuModel\":\"Intel(R) Xeon(R) Platinum 8481C CPU @ 2.70GHz\","
+        + "\"cpuFlags\":[\"avx2\",\"avx512f\",\"avx512vnni\",\"amx_tile\",\"amx_int8\"],"
+        + "\"memoryLimitBytes\":3221225472,\"memorySource\":\"auto\"}"
         + "}";
 
     // What natives before the session pool sent.
@@ -65,6 +70,15 @@ class CapabilitiesTest {
         assertEquals("ready", c.models.get(0).state);
         assertEquals("missing", c.models.get(1).state);
         assertEquals("not installed", c.models.get(1).detail);
+
+        assertNotNull(c.resources);
+        assertEquals(1.5, c.resources.cpuBudget, 1e-9);
+        assertEquals("cpu_max", c.resources.limitedBy);
+        assertEquals(1, c.resources.cores);
+        assertEquals(Integer.valueOf(4), c.resources.physicalCores);
+        assertNull(c.resources.performanceCpus);
+        assertTrue(c.resources.cpuFlags.contains("amx_int8"));
+        assertEquals(Long.valueOf(3221225472L), c.resources.memoryLimitBytes);
 
         assertNotNull(c.stt);
         assertEquals("ready", c.stt.state);
