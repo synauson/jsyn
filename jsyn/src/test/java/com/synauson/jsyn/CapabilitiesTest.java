@@ -12,11 +12,15 @@ class CapabilitiesTest {
         + "\"plan\":\"speech\",\"daysRemaining\":27,\"problem\":null},"
         + "\"limitsScope\":\"this instance\",\"overdraft\":0.25,"
         + "\"capabilities\":["
-        + "{\"code\":\"FEATURE_VAD\",\"entitled\":true,\"includedBy\":\"FEATURE_TURN_DETECTION\"},"
-        + "{\"code\":\"FEATURE_TURN_DETECTION\",\"entitled\":true,\"includedBy\":null}],"
+        + "{\"code\":\"FEATURE_VAD\",\"entitled\":true,\"includedBy\":\"FEATURE_STT\"},"
+        + "{\"code\":\"FEATURE_TURN_DETECTION\",\"entitled\":true,\"includedBy\":\"FEATURE_STT\"},"
+        + "{\"code\":\"FEATURE_STT\",\"entitled\":true,\"includedBy\":null},"
+        + "{\"code\":\"FEATURE_TTS\",\"entitled\":true,\"includedBy\":null}],"
         + "\"models\":["
         + "{\"id\":\"sentito-1\",\"version\":\"5\",\"release\":\"5.0.0\",\"state\":\"ready\",\"detail\":null},"
-        + "{\"id\":\"fermata-1\",\"version\":\"1.0.0-cpu\",\"release\":\"1.0.0\",\"state\":\"missing\",\"detail\":\"not installed\"}],"
+        + "{\"id\":\"fermata-1\",\"version\":\"1.0.0-cpu\",\"release\":\"1.0.0\",\"state\":\"missing\",\"detail\":\"not installed\"},"
+        + "{\"id\":\"spartito-1\",\"version\":\"1.0.0-int8\",\"release\":\"1.0.0\",\"state\":\"ready\",\"detail\":null},"
+        + "{\"id\":\"lettura-1\",\"version\":\"1.0.0-fp32\",\"release\":\"1.0.0\",\"state\":\"downloading\",\"detail\":null}],"
         + "\"stt\":{\"state\":\"ready\",\"calibrated\":true,\"workers\":3,\"threadsPerWorker\":5,"
         + "\"realTimeFactor\":0.79,\"modelBytes\":64487424,\"sharedModelBytes\":603979776,\"limitedBy\":\"cpu\","
         + "\"streams\":{\"limit\":3,\"inUse\":1},\"detail\":null,"
@@ -65,14 +69,21 @@ class CapabilitiesTest {
         assertEquals(19, c.sessions.peak);
         assertEquals("2026-10-04T09:12:00+00:00", c.sessions.peakAt);
 
-        assertEquals(2, c.capabilities.size());
+        assertEquals(4, c.capabilities.size());
         assertEquals("FEATURE_TURN_DETECTION", c.capabilities.get(1).code);
-        assertEquals("FEATURE_TURN_DETECTION", c.capabilities.get(0).includedBy);
-        assertNull(c.capabilities.get(1).includedBy);
+        assertEquals("FEATURE_STT", c.capabilities.get(0).includedBy);
+        assertEquals("FEATURE_STT", c.capabilities.get(1).includedBy);
+        assertEquals("FEATURE_TTS", c.capabilities.get(3).code);
+        assertTrue(c.capabilities.get(3).entitled);
+        assertNull(c.capabilities.get(3).includedBy);
 
         assertEquals("ready", c.models.get(0).state);
         assertEquals("missing", c.models.get(1).state);
         assertEquals("not installed", c.models.get(1).detail);
+        assertEquals(4, c.models.size());
+        assertEquals("lettura-1", c.models.get(3).id);
+        assertEquals("1.0.0-fp32", c.models.get(3).version);
+        assertEquals("downloading", c.models.get(3).state);
 
         assertNotNull(c.resources);
         assertEquals(1.5, c.resources.cpuBudget, 1e-9);
@@ -154,11 +165,19 @@ class CapabilitiesTest {
 
     @Test
     void nativesOlderThanInclusionReportNoIncludedBy() {
-        String older = JSON.replace(",\"includedBy\":\"FEATURE_TURN_DETECTION\"", "")
+        String older = JSON.replace(",\"includedBy\":\"FEATURE_STT\"", "")
             .replace(",\"includedBy\":null", "");
         Capabilities c = Capabilities.fromJson(older);
         assertTrue(c.capabilities.get(0).entitled);
         assertNull(c.capabilities.get(0).includedBy);
+    }
+
+    @Test
+    void nativesOlderThanTtsReportThreeCapabilities() {
+        String older = JSON.replace(",{\"code\":\"FEATURE_TTS\",\"entitled\":true,\"includedBy\":null}", "");
+        Capabilities c = Capabilities.fromJson(older);
+        assertEquals(3, c.capabilities.size());
+        assertEquals("FEATURE_STT", c.capabilities.get(2).code);
     }
 
     @Test

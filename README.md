@@ -495,12 +495,14 @@ the engine starts on the cached license, or else on the free floor.
 
 A license has a **plan** and one number. The plan says what new work may use, and each
 plan includes everything in the one below it: `detect` runs VAD and turn detection, `speech`
-adds STT. The number is how many **AI sessions** may run at once: a participant with any
+adds STT and TTS. TTS is licensed and its model downloads, but jsyn has no API that
+speaks yet. The number is how many **AI sessions** may run at once: a participant with any
 detector takes one session, whatever detectors it has, and conferences and participants
 without detectors take none.
 
 - A detector the plan lacks throws `PermissionDeniedException` naming its entitlement
-  code (`FEATURE_VAD`, `FEATURE_TURN_DETECTION`, `FEATURE_STT`).
+  code (`FEATURE_VAD`, `FEATURE_TURN_DETECTION`, `FEATURE_STT`). The fourth code,
+  `FEATURE_TTS`, comes with `speech` and gates nothing in jsyn yet.
 - From 80% of the session limit the engine logs a warning for each new session. Above
   the limit, a burst (25% unless the license sets another) is still admitted and logged
   as overage. Past the burst, adding a participant with a detector throws
@@ -513,12 +515,16 @@ without detectors take none.
 `expiring`, `grace`, `expired-floor`, `invalid-kept-last-valid`, `free-floor` or
 `rejected`), `license.plan`, `license.daysRemaining` and `license.problem`; `sessions`
 (limit, in use, the burst's `ceiling`, a `level` from `ok` to `full`, and the peak since
-start); each capability with `entitled` and `includedBy`; and the state of each model.
+start); each capability (`FEATURE_VAD`, `FEATURE_TURN_DETECTION`, `FEATURE_STT`,
+`FEATURE_TTS`, in that order) with `entitled` and `includedBy`; and the state of each
+model (`sentito-1`, `fermata-1`, `spartito-1`, `lettura-1`).
 
-The models (sentito-1, turn detection) download into the model store in the background.
+The models the plan includes download into the model store in the background: sentito
+VAD and turn detection for `detect`; for `speech` also spartito-1 for STT (about 660 MB) and
+lettura-1 for TTS with its voices and pronunciation data (about 347 MB).
 Adding a detector before its model is ready throws `FailedPreconditionException` naming
 the model. On a host with no internet access, set `offline(true)` and a `licenseFile`, and
-fill the store from a folder of `.onnx` files with `JSyn.importModels(from, store)`.
+fill the store from a folder of model files with `JSyn.importModels(from, store)`.
 
 The [licensing tour](https://github.com/synauson/examples/tree/main/java/jsyn-licensing)
 walks through all of this against a real free license, including how to wait for models

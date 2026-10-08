@@ -140,7 +140,8 @@ public final class Capabilities {
         public final @Nullable String licenseExpiry;
         /**
          * What new work may use now: {@code "none"}, {@code "detect"} (VAD and turn
-         * detection) or {@code "speech"} (adds STT). {@code null} from older natives.
+         * detection) or {@code "speech"} (adds STT and TTS; jsyn has no TTS API yet).
+         * {@code null} from older natives.
          *
          * @since 1.6.0
          */
@@ -334,11 +335,16 @@ public final class Capabilities {
      * @since 1.4.0
      */
     public static final class CapabilityInfo {
-        /** Entitlement code, e.g. {@code FEATURE_TURN_DETECTION}. */
+        /**
+         * Entitlement code: {@code FEATURE_VAD}, {@code FEATURE_TURN_DETECTION},
+         * {@code FEATURE_STT} or {@code FEATURE_TTS}, in that order. Newer natives may
+         * append codes.
+         */
         public final String code;
         /**
          * Whether the license's plan includes it, itself or through an entitlement that
-         * includes it: {@code FEATURE_STT} includes turn detection, which includes VAD.
+         * includes it: {@code FEATURE_STT} and {@code FEATURE_TTS} each include turn
+         * detection, which includes VAD.
          */
         public final boolean entitled;
         /**
@@ -350,9 +356,9 @@ public final class Capabilities {
         public final @Nullable Usage streams;
         /**
          * The entitlement code that grants this capability when the license doesn't name
-         * it itself, e.g. {@code FEATURE_STT} for turn detection under a license with only
-         * {@code FEATURE_STT}. {@code null} when the license names it, doesn't include it,
-         * or the natives predate inclusion.
+         * it itself, e.g. {@code FEATURE_STT} for turn detection under a license naming
+         * only {@code FEATURE_STT} and {@code FEATURE_TTS}. {@code null} when the license
+         * names it, doesn't include it, or the natives predate inclusion.
          *
          * @since 1.6.0
          */
@@ -372,7 +378,11 @@ public final class Capabilities {
      * @since 1.4.0
      */
     public static final class ModelInfo {
-        /** Model id, e.g. {@code sentito-1}. */
+        /**
+         * Model id: {@code sentito-1}, {@code fermata-1}, {@code spartito-1} (STT) or
+         * {@code lettura-1} (TTS). Every model is listed; one the plan lacks is
+         * {@code "not-entitled"}.
+         */
         public final String id;
         /** Directory name of this version in the model store. */
         public final String version;

@@ -176,7 +176,7 @@ Nothing printed after the version means every element is present. Then run the
 | Direction | Endpoint | Why |
 |---|---|---|
 | Outbound HTTPS | `license.synauson.com` | Exchanges the license key for a signed license at startup, and renews it about once a day |
-| Outbound HTTPS | `*.r2.cloudflarestorage.com` (Cloudflare R2) | Downloads the models the license includes, once per model version |
+| Outbound HTTPS | `*.r2.cloudflarestorage.com` (Cloudflare R2) | Downloads the models the license includes, once per model version: about 11 MB for `detect`; a `speech` license adds the STT model (about 660 MB) and the lettura-1 TTS model with its voices and pronunciation data (about 347 MB) |
 | Outbound HTTPS | `maven.synauson.com` | The jsyn jars, at build time only |
 | Outbound UDP 19302 | `stun.l.google.com` | The default STUN server for WebRTC; change it with `JSynConfig.Builder.webrtcStunServer` |
 | Inbound and outbound UDP | The SIP RTP range | `rtpPortMin` to `rtpPortMax` (default 10000 to 20000) |
@@ -232,7 +232,8 @@ memory one worker's model copy takes) and sets the pool and its stream cap from 
 `realTimeFactor` one stream's decode time over audio time, and `limitedBy` whether CPU
 or memory set it. The measurement is of one stream alone, so on a shared or busy host
 it can be optimistic. `JSynConfig.Builder.sttCapacity(workers, threads, maxStreams)`
-overrides it, and the license's `FEATURE_STT` limit applies on top. The pool sizes
+overrides it. Each STT participant also takes one of the license's concurrent AI
+sessions. The pool sizes
 itself from the runtime's CPU budget, a container's or service's CPU quota and cpuset
 rather than the host's CPU count (`capabilities().resources`); `cpuBudget` and
 `memoryBudget` set it by hand.
