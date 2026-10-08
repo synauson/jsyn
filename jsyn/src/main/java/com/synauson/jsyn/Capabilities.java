@@ -255,7 +255,11 @@ public final class Capabilities {
         public final String version;
         /** Published release version. */
         public final String release;
-        /** {@code "ready"}, {@code "missing"}, {@code "invalid"} or {@code "not-entitled"}. */
+        /**
+         * {@code "ready"}, {@code "downloading"}, {@code "missing"}, {@code "invalid"} or
+         * {@code "not-entitled"}. A failed download stays {@code "missing"} or {@code "invalid"}
+         * and is retried on its own; {@link #detail} says why and when.
+         */
         public final String state;
         /** Why, when not ready. */
         public final @Nullable String detail;
