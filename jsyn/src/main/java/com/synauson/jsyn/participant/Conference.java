@@ -427,7 +427,7 @@ public final class Conference extends NativeResource {
     }
 
     /**
-     * Subscribe to a participant's voice-agent event stream (preview), from every event
+     * Subscribe to a participant's voice-agent event stream, from every event
      * the stream still keeps. Same as {@link #streamAgentEvents(String,
      * AgentStreamOptions, EventStreamObserver)} with {@link AgentStreamOptions#defaults()}.
      *
@@ -446,7 +446,7 @@ public final class Conference extends NativeResource {
     }
 
     /**
-     * Subscribe to a participant's voice-agent event stream (preview): one ordered stream
+     * Subscribe to a participant's voice-agent event stream: one ordered stream
      * of {@link AgentEvent}s for an agent that talks with the participant, which needs a
      * {@link com.synauson.jsyn.spec.TurnDetectionConfig} (and the VAD that drives it).
      *
@@ -455,7 +455,7 @@ public final class Conference extends NativeResource {
      * events, with an {@link AgentEvent.Heartbeat} whenever nothing else came for the
      * heartbeat interval. {@link AgentEvent.StreamEnded} is last, when the participant or
      * the conference goes, and {@code onCompleted} follows. Kinds a newer engine adds
-     * (words, eager end of turn) reach this jsyn as {@link AgentEvent.Unknown}.
+     * (eager end of turn) reach this jsyn as {@link AgentEvent.Unknown}.
      *
      * <p><b>Lag and resume.</b> The observer runs on an engine thread and the engine never
      * waits for it: an observer 256 events behind is dropped, and {@code onError} gets an
@@ -518,7 +518,9 @@ public final class Conference extends NativeResource {
      *
      * @param participantId a participant added with a
      *                      {@link com.synauson.jsyn.spec.TurnDetectionConfig}
-     * @return the id of the turn that ends, or empty when no turn was open
+     * @return the id of the turn that ends, or empty when no turn was open or, with STT,
+     *         the turn had no word yet (a turn is on the stream from its first word; this
+     *         one is sent, with its {@code EndOfTurn}, only if STT then finds words in it)
      * @throws com.synauson.jsyn.exception.NativeResourceClosedException if this conference is closed
      * @throws com.synauson.jsyn.exception.InvalidArgumentException if {@code participantId} is null
      * @throws com.synauson.jsyn.exception.FailedPreconditionException if the participant

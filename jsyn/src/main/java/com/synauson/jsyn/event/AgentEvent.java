@@ -6,24 +6,27 @@ import com.google.gson.JsonParser;
 import com.synauson.jsyn.TurnConfig;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One event on a participant's voice-agent event stream (preview).
+ * One event on a participant's voice-agent event stream.
  *
  * <p>Emitted on the stream returned by
  * {@link com.synauson.jsyn.participant.Conference#streamAgentEvents}. The subclasses
  * are the event kinds: {@link Subscribed}, {@link Heartbeat}, {@link Error},
  * {@link StreamEnded}, {@link SpeechStarted}, {@link SpeechStopped},
- * {@link TurnStarted}, {@link EndOfTurn} and {@link TurnConfigUpdated}. The engine
- * adds kinds over time (words come next); an older jsyn receives those as
- * {@link Unknown}, so handle the kinds you know and ignore the rest.
+ * {@link TurnStarted}, {@link TurnWords}, {@link EndOfTurn} and
+ * {@link TurnConfigUpdated}. The engine adds kinds over time (eager end of turn comes
+ * next); an older jsyn receives those as {@link Unknown}, so handle the kinds you know
+ * and ignore the rest.
  *
  * <p><b>Turns.</b> Turn ids rise by one from 1. Each {@link TurnStarted} is followed by
  * exactly one {@link EndOfTurn} for it, and no event of a turn comes before the
  * previous turn's {@code EndOfTurn}. {@link SpeechStarted} and {@link SpeechStopped}
- * carry no turn and come at once.
+ * carry no turn and come at once. With STT a turn starts with its first word, and its
+ * {@link TurnWords}, in order, are exactly its {@code EndOfTurn}'s words.
  *
  * <p><b>Ordering and resume.</b> Every subscriber sees one order. {@link #seq} rises by
  * one with each stored event, from 1. {@link Subscribed} and {@link Heartbeat} belong to
@@ -93,6 +96,7 @@ public abstract class AgentEvent {
             case "speechStarted": return new SpeechStarted(o);
             case "speechStopped": return new SpeechStopped(o);
             case "turnStarted": return new TurnStarted(o);
+            case "turnWords": return new TurnWords(o);
             case "endOfTurn": return new EndOfTurn(o);
             case "turnConfigUpdated": return new TurnConfigUpdated(o);
             default: return new Unknown(o, type, json);
@@ -177,8 +181,18 @@ public abstract class AgentEvent {
          * still ends the turn.
          */
         public static final String TURN_DECISION_MISSING = "TURN_DECISION_MISSING";
-        /** STT failed on the participant: turns end without text from now on. */
+        /**
+         * STT failed on the participant: turns end with the words they had, and later
+         * ones without words.
+         */
         public static final String STT_STOPPED = "STT_STOPPED";
+        /**
+         * STT's backlog passed the participant's STT drain budget (at least 500 ms;
+         * metadata {@code backlog_ms} and {@code threshold_ms}): turns may end before
+         * their last words, which then open the next turn. Sent again only after the
+         * backlog falls to half the threshold.
+         */
+        public static final String STT_LAGGING = "STT_LAGGING";
 
         /** Stable, upper-case reason, such as {@link #TURN_DECISION_MISSING}. */
         public final String reason;
@@ -249,13 +263,16 @@ public abstract class AgentEvent {
         }
     }
 
-    /** A turn started, on VAD's speech start when no turn was open. */
+    /**
+     * A turn started: with STT on its first word, without STT on VAD's speech start. With
+     * STT a turn without words is never sent.
+     */
     public static final class TurnStarted extends AgentEvent {
         /** Rises by one from 1. */
         public final long turnId;
-        /** Conference time the turn's speech started. */
+        /** Conference time the turn's speech started (VAD's speech start). */
         public final long startMs;
-        /** Whether words started it; false until the engine sends words. */
+        /** Whether words started it: true with STT, false without. */
         public final boolean wordBacked;
 
         TurnStarted(JsonObject o) {
@@ -263,6 +280,27 @@ public abstract class AgentEvent {
             this.turnId = number(o, "turnId");
             this.startMs = number(o, "startMs");
             this.wordBacked = bool(o, "wordBacked");
+        }
+    }
+
+    /**
+     * More of the open turn's words, each once it is complete: the model committed the
+     * next word, or the turn closed. A word once sent is never taken back or moved to
+     * another turn, and a turn's last words come just before its {@link EndOfTurn}.
+     */
+    public static final class TurnWords extends AgentEvent {
+        /** The turn they belong to. */
+        public final long turnId;
+        /** The words, in order. */
+        public final List<Word> words;
+        /** Audio waiting to be transcribed, in ms (a duration); null when not reported. */
+        public final @Nullable Long sttBacklogMs;
+
+        TurnWords(JsonObject o) {
+            super(o);
+            this.turnId = number(o, "turnId");
+            this.words = Word.listFromJson(o.get("words"));
+            this.sttBacklogMs = optionalNumber(o, "sttBacklogMs");
         }
     }
 
@@ -282,10 +320,15 @@ public abstract class AgentEvent {
         /** Why: {@link #MODEL}, {@link #MANUAL}, {@link #TIMEOUT}, {@link #STREAM_ENDED}, or a newer reason. */
         public final String reason;
         /**
-         * The turn's transcript with STT (the same text as its
+         * The turn's words joined by single spaces with STT (the same text as its
          * {@link TranscriptEvent.Turn}, without the leading space); empty without STT.
          */
         public final String text;
+        /**
+         * The turn's words, in order: the ones its {@link TurnWords} carried. Empty without
+         * STT, and from an engine older than words.
+         */
+        public final List<Word> words;
         /** Conference time the turn's speech started. */
         public final long startMs;
         /**
@@ -314,6 +357,7 @@ public abstract class AgentEvent {
             this.turnId = number(o, "turnId");
             this.reason = string(o, "reason");
             this.text = string(o, "text");
+            this.words = Word.listFromJson(o.get("words"));
             this.startMs = number(o, "startMs");
             this.speechEndMs = number(o, "speechEndMs");
             JsonElement p = o.get("probability");

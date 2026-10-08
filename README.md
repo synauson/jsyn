@@ -270,14 +270,14 @@ others. The agent event stream's `AgentStreamException` also carries a stable
 `reason()`. The public API is `@NullMarked` (JSpecify): nothing is null unless it is marked
 `@Nullable`.
 
-### Voice-agent event stream (preview)
+### Voice-agent event stream
 
 An agent that talks with a participant needs one ordered stream of what that
 participant does. `conf.streamAgentEvents(id, options, observer)` delivers it as
 `AgentEvent`s for any participant with `TurnDetectionConfig` (and the `VadConfig` that
 drives it); without turn detection it throws `AgentStreamException` with reason
-`TURN_DETECTION_REQUIRED`. It is a preview: it carries speech activity and the turn
-lifecycle now, and words and early (eager) end of turn come in later releases.
+`TURN_DETECTION_REQUIRED`. It carries speech activity, the turn lifecycle and, with STT,
+each turn's words; early (eager) end of turn comes in a later release.
 
 | Event | Fields | When |
 |---|---|---|
@@ -285,10 +285,11 @@ lifecycle now, and words and early (eager) end of turn come in later releases.
 | `Heartbeat` | `conferenceMs`, `sttDecodedMs`, `sttBacklogMs` | Whenever nothing else came for the heartbeat interval (default 1000 ms, `withHeartbeatMs`) |
 | `SpeechStarted` | `atMs`, `probability` | VAD heard speech start. Raw voice activity: noise can start it too. |
 | `SpeechStopped` | `atMs`, `speechMs` | VAD heard it stop; `speechMs` is how long it lasted |
-| `TurnStarted` | `turnId`, `startMs`, `wordBacked` | A turn started, on VAD's speech start when no turn was open |
-| `EndOfTurn` | `turnId`, `reason`, `text`, `startMs`, `speechEndMs`, `probability`, `complete`, latency fields | The turn ended (below) |
+| `TurnStarted` | `turnId`, `startMs`, `wordBacked` | A turn started: with STT on its first word (`wordBacked` true), without STT on VAD's speech start. `startMs` is VAD's speech start either way. |
+| `TurnWords` | `turnId`, `words`, `sttBacklogMs` | More of the open turn's words, each once it is complete (below) |
+| `EndOfTurn` | `turnId`, `reason`, `text`, `words`, `startMs`, `speechEndMs`, `probability`, `complete`, latency fields | The turn ended (below) |
 | `TurnConfigUpdated` | `config` | `updateTurnConfig` changed the turn config |
-| `Error` | `reason`, `message`, `metadata`, `turnId` | A recoverable problem; the stream goes on. `TURN_DETECTION_FAILED`: turn detection stopped, so only the timeout or `forceEndTurn` end turns from then on. `TURN_DECISION_MISSING`: a speech end got no turn detection decision within 2 s; the timeout still ends the turn. `STT_STOPPED`: STT failed, so turns end without text from then on. |
+| `Error` | `reason`, `message`, `metadata`, `turnId` | A recoverable problem; the stream goes on. `TURN_DETECTION_FAILED`: turn detection stopped, so only the timeout or `forceEndTurn` end turns from then on. `TURN_DECISION_MISSING`: a speech end got no turn detection decision within 2 s; the timeout still ends the turn. `STT_STOPPED`: STT failed, so turns end with the words they had, and later ones without words. `STT_LAGGING`: STT's backlog passed the STT drain budget (at least 500 ms; metadata `backlog_ms`, `threshold_ms`), so turns may end before their last words, which then open the next turn; sent again only after the backlog falls to half. |
 | `StreamEnded` | `reason` | Last: the participant was removed or the conference terminated. `onCompleted` follows. |
 | `Unknown` | `type`, `json` | A kind from a newer engine. Ignore it, but it still has a seq. |
 
@@ -312,16 +313,33 @@ ends for one `reason`:
 - `MANUAL`: you called `conf.forceEndTurn(id)`.
 - `STREAM_ENDED`: the participant or conference went with the turn open.
 
-With STT, `EndOfTurn` waits for the turn's transcript: `text` is the same text as its
-`TranscriptEvent.Turn`, without the leading space, and `complete` is false when STT ran
-out of drain time first. Without STT, `text` is empty and `EndOfTurn` comes at once.
+With STT, `EndOfTurn` waits for the turn's transcript: `words` are its words, `text` is
+them joined by single spaces (the same text as its `TranscriptEvent.Turn`, without the
+leading space), and `complete` is false when STT ran out of drain time first. A turn STT
+finds no words in (a cough, noise) is not on the agent stream at all. Without STT,
+`text` and `words` are empty and `EndOfTurn` comes at once.
 `speechEndMs` is where the turn's speech ended (when it ended, if the participant was
 still speaking); the latency fields (`sinceSpeechEndMs`, `decisionMs`, `drainMs`,
 `sttBacklogMs`) are durations, null when not known.
 
+**Words.** With STT, each `Word` has `text` (with its punctuation and no leading space,
+such as `Hello,`), `startMs`, `endMs` and `confidence`. A word goes out in a `TurnWords`
+once it is complete, which is when the model has committed the next word or the turn
+has closed, so words trail the speech by about one word. The turn's last words come in
+a `TurnWords` just before its `EndOfTurn`. A turn's `TurnWords`, in order, are exactly
+its `EndOfTurn.words`: a word once sent is never taken back or moved to another turn,
+so you can start working on a turn's words before it ends. Word times are conference
+time and are when the model emitted the word, not where it was spoken: they trail the
+audio by up to the model's commit delay (about 800 ms for the default model before a
+pause, less in running speech). `startMs` is when its first piece was emitted, `endMs`
+where its last piece ends. `confidence` is the lowest of the model's probabilities for
+the word's pieces, in [0, 1], or null when the model gives none. Read it as a relative
+score that flags a word worth confirming, not as a calibrated chance of being right.
+
 **Ending turns and the turn config.** `conf.forceEndTurn(id)` ends the open turn now
-and returns its id (empty when none was open); its `EndOfTurn` follows with reason
-`MANUAL`. With STT the engine forecasts the turn's last words, so the text usually
+and returns its id (empty when none was open, or, with STT, when the turn had no word
+yet: such a turn is sent, with its `EndOfTurn`, only if STT then finds words in it);
+its `EndOfTurn` follows with reason `MANUAL`. With STT the engine forecasts the turn's last words, so the text usually
 comes within about 100 ms on an idle machine and never later than the STT drain
 budget. If the participant is still speaking, the next turn starts at once.
 `conf.updateTurnConfig(id, update)` changes the end-of-turn threshold or timeout
@@ -526,6 +544,7 @@ API.
 | Voice activity detection | [VadDetectorIT], [RealVadE2eLatencyIT] | `VadConfig.defaults()`, a self-connection so audio reaches the detector, then `VadEvent.SpeechStart` |
 | End-of-turn detection | [TurnDetectionIT] | `TurnDetectionConfig` alongside VAD (without VAD it throws `InvalidArgumentException`), then `TurnDetectionEvent.TurnResult` |
 | Voice-agent turns | [AgentTurnsIT] | `TurnDetectionConfig.withTurns`, `forceEndTurn` ending the open turn with `MANUAL`, `updateTurnConfig` answered and announced, and the refusals |
+| Voice-agent words | [AgentWordsIT] | STT on (`sttCapacity`, waiting for `capabilities().stt.state` to be `ready`): a word-backed `TurnStarted`, `TurnWords` adding up to `EndOfTurn.words`, `text` as the words joined, word times and confidences |
 | Voice-agent event stream | [AgentStreamIT] | `streamAgentEvents`: `Subscribed` first, speech events in conference time, resuming from a cursor, `StreamEnded` on removal, and `TURN_DETECTION_REQUIRED` without turn detection |
 | Streaming speech-to-text | [SttIT] | `SttConfig` needs `TurnDetectionConfig`, `streamTranscriptEvents` needs STT on the participant, and `capabilities().stt` |
 | Speech-to-text on a WebRTC call | [WebRtcSttE2eIT] | A browser speaking into a participant with VAD, turn detection and STT: wait for `capabilities().stt.state` to be `ready`, subscribe before answering, then read the words from `EndOfTurn.text` and `TranscriptEvent.Turn`, joining turns (a turn that ran out of drain time hands its last words to the next) |
@@ -556,6 +575,7 @@ their javadoc. `capabilities()` is covered by the licensing tour.
 [SttIT]: jsyn/src/test/java/com/synauson/jsyn/it/SttIT.java
 [AgentStreamIT]: jsyn/src/test/java/com/synauson/jsyn/it/AgentStreamIT.java
 [AgentTurnsIT]: jsyn/src/test/java/com/synauson/jsyn/it/AgentTurnsIT.java
+[AgentWordsIT]: jsyn/src/test/java/com/synauson/jsyn/it/AgentWordsIT.java
 [ModelStoreIT]: jsyn/src/test/java/com/synauson/jsyn/it/ModelStoreIT.java
 [SipParticipantIT]: jsyn/src/test/java/com/synauson/jsyn/it/SipParticipantIT.java
 [SipMediaE2eIT]: jsyn/src/test/java/com/synauson/jsyn/it/SipMediaE2eIT.java

@@ -69,7 +69,7 @@ class AgentEventJsonTest {
         AgentEvent.Error err = assertInstanceOf(AgentEvent.Error.class,
             parse(5, "\"type\":\"error\",\"reason\":\"STT_LAGGING\",\"message\":\"behind\","
                 + "\"metadata\":{\"backlog_ms\":\"900\"},\"turnId\":3"));
-        assertEquals("STT_LAGGING", err.reason);
+        assertEquals(AgentEvent.Error.STT_LAGGING, err.reason);
         assertEquals("behind", err.message);
         assertEquals("900", err.metadata.get("backlog_ms"));
         assertEquals(Long.valueOf(3), err.turnId);
@@ -88,19 +88,35 @@ class AgentEventJsonTest {
         assertEquals(1500, stop.speechMs);
 
         AgentEvent.TurnStarted turn = assertInstanceOf(AgentEvent.TurnStarted.class,
-            parse(3, "\"type\":\"turnStarted\",\"turnId\":1,\"startMs\":1000,\"wordBacked\":false"));
+            parse(3, "\"type\":\"turnStarted\",\"turnId\":1,\"startMs\":1000,\"wordBacked\":true"));
         assertEquals(1, turn.turnId);
         assertEquals(1000, turn.startMs);
-        assertFalse(turn.wordBacked);
+        assertTrue(turn.wordBacked);
+
+        AgentEvent.TurnWords words = assertInstanceOf(AgentEvent.TurnWords.class,
+            parse(4, "\"type\":\"turnWords\",\"turnId\":1,\"words\":[" + HELLO + "],"
+                + "\"sttBacklogMs\":40"));
+        assertEquals(1, words.turnId);
+        assertEquals(1, words.words.size());
+        assertHello(words.words.get(0));
+        assertEquals(Long.valueOf(40), words.sttBacklogMs);
+        AgentEvent.TurnWords unrated = assertInstanceOf(AgentEvent.TurnWords.class,
+            parse(4, "\"type\":\"turnWords\",\"turnId\":1,\"words\":[{\"text\":\"hi\","
+                + "\"startMs\":5,\"endMs\":6}]"));
+        assertNull(unrated.words.get(0).confidence, "absent when the model gives none");
+        assertNull(unrated.sttBacklogMs);
 
         AgentEvent.EndOfTurn end2 = assertInstanceOf(AgentEvent.EndOfTurn.class,
             parse(4, "\"type\":\"endOfTurn\",\"turnId\":1,\"reason\":\"MODEL\","
-                + "\"text\":\"hello there\",\"startMs\":1000,\"speechEndMs\":2500,"
+                + "\"text\":\"hello\",\"words\":[" + HELLO + "],\"startMs\":1000,\"speechEndMs\":2500,"
                 + "\"probability\":0.75,\"complete\":true,\"latency\":{\"sinceSpeechEndMs\":400,"
                 + "\"decisionMs\":30,\"drainMs\":250,\"sttBacklogMs\":80}"));
         assertEquals(1, end2.turnId);
         assertEquals(AgentEvent.EndOfTurn.MODEL, end2.reason);
-        assertEquals("hello there", end2.text);
+        assertEquals("hello", end2.text);
+        assertEquals(1, end2.words.size());
+        assertHello(end2.words.get(0));
+        assertEquals(words.words, end2.words, "words compare by value");
         assertEquals(1000, end2.startMs);
         assertEquals(2500, end2.speechEndMs);
         assertEquals(0.75f, end2.probability, 1e-6);
@@ -116,10 +132,22 @@ class AgentEventJsonTest {
         assertNull(bare.probability, "absent when turn detection didn't decide");
         assertNull(bare.decisionMs);
         assertNull(bare.drainMs);
+        assertTrue(bare.words.isEmpty(), "no words key: an engine before words");
 
         AgentEvent.TurnConfigUpdated updated = assertInstanceOf(AgentEvent.TurnConfigUpdated.class,
             parse(5, "\"type\":\"turnConfigUpdated\",\"config\":" + CONFIG));
         assertConfig(updated.config);
+    }
+
+    /** A word as the engine sends it. */
+    private static final String HELLO =
+        "{\"text\":\"Hello,\",\"startMs\":1200,\"endMs\":1360,\"confidence\":0.5}";
+
+    private static void assertHello(Word w) {
+        assertEquals("Hello,", w.text);
+        assertEquals(1200, w.startMs);
+        assertEquals(1360, w.endMs);
+        assertEquals(0.5f, w.confidence, 1e-6);
     }
 
     /** A turn config as the engine sends it. */
@@ -162,9 +190,9 @@ class AgentEventJsonTest {
 
     @Test
     void aKindFromANewerEngineIsUnknownNotAnError() {
-        String json = "{" + ENVELOPE + "\"seq\":7,\"type\":\"turnWords\",\"turnId\":1}";
+        String json = "{" + ENVELOPE + "\"seq\":7,\"type\":\"eagerEndOfTurn\",\"turnId\":1}";
         AgentEvent.Unknown u = assertInstanceOf(AgentEvent.Unknown.class, AgentEvent.fromJson(json));
-        assertEquals("turnWords", u.type);
+        assertEquals("eagerEndOfTurn", u.type);
         assertEquals(json, u.json);
         assertEquals(7, u.seq, "the envelope is still read");
         assertEquals("p", u.participantId);
