@@ -85,6 +85,13 @@ public final class Capabilities {
      */
     public final @Nullable Calibration calibration;
 
+    /**
+     * This machine's TTS capacity. {@code null} from natives older than the speaker.
+     *
+     * @since 1.6.0
+     */
+    public final @Nullable TtsCapacity tts;
+
     private Capabilities() {
         this.license = null;
         this.limitsScope = null;
@@ -97,6 +104,7 @@ public final class Capabilities {
         this.sessions = null;
         this.resources = null;
         this.calibration = null;
+        this.tts = null;
     }
 
     /**
@@ -485,6 +493,42 @@ public final class Capabilities {
             this.turnFlush = null;
             this.forecastReserve = null;
             this.source = null;
+        }
+    }
+
+    /**
+     * TTS's synthesis pool, and how many utterances it synthesises at once. The shape
+     * comes from the CPU count, or is set with {@link JSynConfig.Builder#ttsCapacity}. A
+     * speaker takes a place only while it speaks: from its utterance's first chunk until
+     * the utterance is played or interrupted. Each participant with a speaker also takes
+     * a license session.
+     *
+     * @since 1.6.0
+     */
+    public static final class TtsCapacity {
+        /**
+         * {@code "ready"}; {@code "loading"} (the engine loads in the background, and
+         * adding a participant with a speaker throws {@code FailedPreconditionException}
+         * until it is ready); {@code "idle"} (not started: no license or model yet,
+         * {@link #detail} says which); or {@code "failed"} (the next participant with a
+         * speaker tries again).
+         */
+        public final String state;
+        /** Synthesis workers, once known. */
+        public final @Nullable Integer workers;
+        /** ONNX Runtime threads per worker, once known. */
+        public final @Nullable Integer threadsPerWorker;
+        /** The cap on utterances synthesising at once (once known), and how many are. */
+        public final Usage streams;
+        /** Why it is idle, or failed. */
+        public final @Nullable String detail;
+
+        private TtsCapacity() {
+            this.state = null;
+            this.workers = null;
+            this.threadsPerWorker = null;
+            this.streams = null;
+            this.detail = null;
         }
     }
 }

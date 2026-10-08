@@ -58,6 +58,16 @@ class NullArgumentsTest {
         assertInvalid("participantId must not be null", () -> conf.streamDtmfEvents(null, e -> {}));
         assertInvalid("participantId must not be null",
             () -> conf.streamWebRtcIceCandidates(null, e -> {}));
+        assertInvalid("participantId must not be null",
+            () -> conf.speak(null, com.synauson.jsyn.spec.Speak.complete("u", "hi")));
+        assertInvalid("participantId must not be null", () -> conf.cancelUtterance(null, "u"));
+        assertInvalid("participantId must not be null", () -> conf.cancelUtterances(null));
+    }
+
+    @Test
+    void speakerCommandsRejectNullArguments() {
+        assertInvalid("speak must not be null", () -> conf.speak("p", null));
+        assertInvalid("utteranceId must not be null", () -> conf.cancelUtterance("p", null));
     }
 
     @Test

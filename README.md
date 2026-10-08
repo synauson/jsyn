@@ -4,10 +4,10 @@
 
 jsyn is the Java SDK for the [Synauson](https://synauson.com) media engine. It runs the
 engine inside your JVM through JNI, so there is no separate server to deploy. The engine
-includes GStreamer media pipelines, an audio router, and ONNX voice-activity and
-end-of-turn detectors. From Java you create conferences, connect SIP, WebRTC, file and
-in-process audio participants, route audio between them, and receive detector and
-signalling events.
+includes GStreamer media pipelines, an audio router, and ONNX models for voice
+activity, end of turn, speech-to-text and text-to-speech. From Java you create
+conferences, connect SIP, WebRTC, file and in-process audio participants, route audio
+between them, receive detector, transcript and signalling events, and speak into calls.
 
 - [Requirements](#requirements)
 - [Install](#install)
@@ -276,12 +276,14 @@ An agent that talks with a participant needs one ordered stream of what that
 participant does. `conf.streamAgentEvents(id, options, observer)` delivers it as
 `AgentEvent`s for any participant with `TurnDetectionConfig` (and the `VadConfig` that
 drives it); without turn detection it throws `AgentStreamException` with reason
-`TURN_DETECTION_REQUIRED`. It carries speech activity, the turn lifecycle and, with STT,
-each turn's words; early (eager) end of turn comes in a later release.
+`TURN_DETECTION_REQUIRED`. It carries speech activity, the turn lifecycle, with STT
+each turn's words, and with a speaker what it played (see
+[Speaking into the call](#speaking-into-the-call)); early (eager) end of turn comes in a
+later release.
 
 | Event | Fields | When |
 |---|---|---|
-| `Subscribed` | `oldestSeq`, `lastSeq`, `stt`, `turnConfig` | First on every subscription: the oldest event the stream keeps, its newest seq, whether STT runs, the turn config in effect |
+| `Subscribed` | `oldestSeq`, `lastSeq`, `stt`, `turnConfig`, `tts`, `voice` | First on every subscription: the oldest event the stream keeps, its newest seq, whether STT runs, the turn config in effect, whether the participant has a speaker and its default voice |
 | `Heartbeat` | `conferenceMs`, `sttDecodedMs`, `sttBacklogMs` | Whenever nothing else came for the heartbeat interval (default 1000 ms, `withHeartbeatMs`) |
 | `SpeechStarted` | `atMs`, `probability` | VAD heard speech start. Raw voice activity: noise can start it too. |
 | `SpeechStopped` | `atMs`, `speechMs` | VAD heard it stop; `speechMs` is how long it lasted |
@@ -289,6 +291,11 @@ each turn's words; early (eager) end of turn comes in a later release.
 | `TurnWords` | `turnId`, `words`, `sttBacklogMs` | More of the open turn's words, each once it is complete (below) |
 | `EndOfTurn` | `turnId`, `reason`, `text`, `words`, `startMs`, `speechEndMs`, `probability`, `complete`, latency fields | The turn ended (below) |
 | `TurnConfigUpdated` | `config` | `updateTurnConfig` changed the turn config |
+| `UtteranceStarted` | `utteranceId`, `atMs`, `timeToFirstAudioMs`, `egressDelayMs` | The speaker's first sample of an utterance played |
+| `WordsPlayed` | `utteranceId`, `words` | More of the utterance's words fully played (`PlayedWord`) |
+| `UtteranceDone` | `utteranceId`, `audioMs`, `atMs`, `underrunMs` | The utterance played to its end |
+| `UtteranceInterrupted` | `utteranceId`, `reason`, `heardText`, `heardTextEnd`, `heardMs` | It stopped early: `CANCELLED` (`cancelUtterance`), `PREEMPTED` (a new utterance started while it was preemptible) or `STREAM_ENDED` (the participant or conference went; before `StreamEnded`) |
+| `UtteranceFailed` | `utteranceId`, `code`, `message` | It failed: `TTS_UNAVAILABLE`, `SYNTHESIS_FAILED`, `UNSPEAKABLE_TEXT` (nothing to say, or a word too long for the model) or `TTS_CAPACITY` (the machine's TTS capacity was in use when it was to start) |
 | `Error` | `reason`, `message`, `metadata`, `turnId` | A recoverable problem; the stream goes on. `TURN_DETECTION_FAILED`: turn detection stopped, so only the timeout or `forceEndTurn` end turns from then on. `TURN_DECISION_MISSING`: a speech end got no turn detection decision within 2 s; the timeout still ends the turn. `STT_STOPPED`: STT failed, so turns end with the words they had, and later ones without words. `STT_LAGGING`: STT's backlog passed the STT drain budget (at least 500 ms; metadata `backlog_ms`, `threshold_ms`), so turns may end before their last words, which then open the next turn; sent again only after the backlog falls to half. |
 | `StreamEnded` | `reason` | Last: the participant was removed or the conference terminated. `onCompleted` follows. |
 | `Unknown` | `type`, `json` | A kind from a newer engine. Ignore it, but it still has a seq. |
@@ -486,6 +493,121 @@ public class AgentStreamReader implements EventStreamObserver<AgentEvent> {
 }
 ```
 
+### Speaking into the call
+
+Give a participant a speaker with `.tts(TtsConfig.defaults())` on its spec, next to the
+`TurnDetectionConfig` and `VadConfig` it needs (a speaker without turn detection throws
+`InvalidArgumentException`): its playback is reported on the participant's agent
+stream. `TtsConfig` sets the default voice (`en-us-f1` unless you pick another of the
+model's voices, such as `en-us-m1`), the default speed (0.25 to 4) and the speaker's id
+as a routing source (`<participant id>.speaker`), so you can also route it to a
+recording. The speaker plays to its own participant; a file participant has no output,
+so its speaker plays only where you route it. TTS needs `FEATURE_TTS` in the license.
+Its engine loads in the background when the runtime starts; until
+`capabilities().tts.state` is `ready`, adding a participant with a speaker throws
+`FailedPreconditionException`.
+
+`conf.speak(id, speak)` sends text. A new utterance id starts an utterance, which
+queues behind any still playing, and the same id adds text to it until a Speak with
+`Release.END`; `Speak.complete(id, text)` is a whole utterance in one call. Send an
+LLM's reply piece by piece as it is written: the speaker reads numbers, money, dates
+and codes as a person would, holds back what could still change (a number still being
+written), starts after the first two words, and then keeps synthesis ahead of
+playback. `Release.FLUSH` speaks everything sent so far now and leaves the utterance
+open. `speak` returns once the speaker has the text, `true` when it started the
+utterance. A Speak's text is at most 16 KiB and an utterance's 64 KiB. Each utterance
+can be `interruptible` (default true), `preemptible` (default false: the next new
+utterance stops it) and have its own `voice` and `speed`, all set on its first Speak.
+
+`conf.cancelUtterance(id, utteranceId)` stops one utterance, playing or queued, and
+`conf.cancelUtterances(id)` stops every interruptible one, which is what to do when the
+caller barges in. The audio stops within one 20 ms buffer plus what the participant's
+mixer holds (20 ms on SIP, 60 ms on WebRTC). Each returns a `CancelledUtterance` per
+stopped utterance with `heardText` (the text up to its last fully played word), `heardMs`
+and the `seq` of its `UtteranceInterrupted`, which is already on the stream.
+
+**Playback events.** Each utterance that plays any audio gets one `UtteranceStarted`,
+then its `WordsPlayed`, then exactly one of `UtteranceDone`, `UtteranceInterrupted` or
+`UtteranceFailed`. One cancelled or failed before any of its audio played gets only that
+last event. "Played" means the audio passed the speaker's clock-synced point, the last
+place the engine can stop it, so `heardText` is exact; the audio leaves the engine about
+`egressDelayMs` later, plus the network and the far end's jitter buffer. A `PlayedWord`
+has `text` (as sent, with its punctuation; an entity read as several words, such as
+`$42.50`, is one word), `textStart` and `textEnd` (its place in the utterance's text,
+everything its Speaks sent), and `startMs` and `endMs` (where it sounds, in ms from the
+utterance's first sample). The text offsets count **Unicode code points**, while Java
+strings index UTF-16 chars, so the two differ after an emoji or any other character
+outside the Basic Multilingual Plane: use `word.charStart(text)` and
+`word.charEnd(text)`, which call `String.offsetByCodePoints`. `heardText` is a prefix of
+the text, so `heardText.length()` is already the char index where the unheard text
+starts; `heardTextEnd` is the same place in code points.
+
+The errors lead their exception's message with a reason: `FailedPreconditionException`
+for `TTS_REQUIRED` (no speaker), `UTTERANCE_ENDED` (more text for an utterance that
+ended, finished, was interrupted or failed: ids are never reused) and
+`UTTERANCE_NOT_INTERRUPTIBLE`; `NotFoundException` for `UNKNOWN_UTTERANCE` (an id the
+speaker never had); `InvalidArgumentException` for `INVALID_SPEAK` (an empty or overlong
+id, text over its cap, a voice or speed after the first Speak, an unknown voice, a speed
+out of range, more than 64 utterances held).
+
+<!-- snippet: agent-speak -->
+```java
+import com.synauson.jsyn.CancelledUtterance;
+import com.synauson.jsyn.event.AgentEvent;
+import com.synauson.jsyn.participant.Conference;
+import com.synauson.jsyn.spec.Speak;
+import com.synauson.jsyn.spec.TtsConfig;
+import java.util.Iterator;
+import java.util.concurrent.BlockingQueue;
+
+/** Speaks an answer to each of the caller's turns and stops when the caller talks over it. */
+public class AgentSpeech {
+    /** The caller's speaker, set on its spec next to VadConfig and TurnDetectionConfig. */
+    public static TtsConfig voice() {
+        return TtsConfig.defaults().withVoice("en-us-m1");
+    }
+
+    private int replies;
+
+    public void run(Conference conf, String callerId, BlockingQueue<AgentEvent> events)
+            throws InterruptedException {
+        while (true) {
+            AgentEvent event = events.take();
+            if (event instanceof AgentEvent.EndOfTurn) {
+                String id = "reply-" + (++replies);
+                speak(conf, callerId, id, answer(((AgentEvent.EndOfTurn) event).text));
+            } else if (event instanceof AgentEvent.SpeechStarted) {
+                // The caller talks over the agent: stop, and keep only what they heard.
+                for (CancelledUtterance c : conf.cancelUtterances(callerId)) {
+                    heard(c.utteranceId, c.heardText);
+                }
+            } else if (event instanceof AgentEvent.StreamEnded) {
+                return;
+            }
+        }
+    }
+
+    /**
+     * Stream an LLM's reply as it is written; speech starts after the first words. A real
+     * agent runs this off the event loop, so it still sees the caller barge in.
+     */
+    private static void speak(Conference conf, String callerId, String id, Iterator<String> tokens) {
+        while (tokens.hasNext()) {
+            conf.speak(callerId, Speak.builder().utteranceId(id).text(tokens.next()).build());
+        }
+        conf.speak(callerId, Speak.builder().utteranceId(id).release(Speak.Release.END).build());
+    }
+
+    private static Iterator<String> answer(String callerSaid) {
+        throw new UnsupportedOperationException("your LLM goes here");
+    }
+
+    private static void heard(String utteranceId, String heardText) {
+        // Record in the conversation what the caller actually heard.
+    }
+}
+```
+
 ### Licensing and models
 
 The license key comes from `JSynConfig.licenseKey`, or from `$SYNAUSON_LICENSE_KEY` when
@@ -495,14 +617,13 @@ the engine starts on the cached license, or else on the free floor.
 
 A license has a **plan** and one number. The plan says what new work may use, and each
 plan includes everything in the one below it: `detect` runs VAD and turn detection, `speech`
-adds STT and TTS. TTS is licensed and its model downloads, but jsyn has no API that
-speaks yet. The number is how many **AI sessions** may run at once: a participant with any
+adds STT and TTS. The number is how many **AI sessions** may run at once: a participant with any
 detector takes one session, whatever detectors it has, and conferences and participants
 without detectors take none.
 
-- A detector the plan lacks throws `PermissionDeniedException` naming its entitlement
-  code (`FEATURE_VAD`, `FEATURE_TURN_DETECTION`, `FEATURE_STT`). The fourth code,
-  `FEATURE_TTS`, comes with `speech` and gates nothing in jsyn yet.
+- A detector or speaker the plan lacks throws `PermissionDeniedException` naming its
+  entitlement code (`FEATURE_VAD`, `FEATURE_TURN_DETECTION`, `FEATURE_STT`,
+  `FEATURE_TTS`).
 - From 80% of the session limit the engine logs a warning for each new session. Above
   the limit, a burst (25% unless the license sets another) is still admitted and logged
   as overage. Past the burst, adding a participant with a detector throws
@@ -551,6 +672,7 @@ API.
 | End-of-turn detection | [TurnDetectionIT] | `TurnDetectionConfig` alongside VAD (without VAD it throws `InvalidArgumentException`), then `TurnDetectionEvent.TurnResult` |
 | Voice-agent turns | [AgentTurnsIT] | `TurnDetectionConfig.withTurns`, `forceEndTurn` ending the open turn with `MANUAL`, `updateTurnConfig` answered and announced, and the refusals |
 | Voice-agent words | [AgentWordsIT] | STT on (`sttCapacity`, waiting for `capabilities().stt.state` to be `ready`): a word-backed `TurnStarted`, `TurnWords` adding up to `EndOfTurn.words`, `text` as the words joined, word times and confidences |
+| Voice-agent speech | [AgentSpeakIT] | A speaker (`TtsConfig`, `ttsCapacity`, waiting for `capabilities().tts.state` to be `ready`): `speak` and its `UtteranceStarted`, `WordsPlayed` slicing the sent text, `UtteranceDone`, then `cancelUtterance` with the `UtteranceInterrupted` it names, and the reasoned refusals |
 | Voice-agent event stream | [AgentStreamIT] | `streamAgentEvents`: `Subscribed` first, speech events in conference time, resuming from a cursor, `StreamEnded` on removal, and `TURN_DETECTION_REQUIRED` without turn detection |
 | Streaming speech-to-text | [SttIT] | `SttConfig` needs `TurnDetectionConfig`, `streamTranscriptEvents` needs STT on the participant, and `capabilities().stt` |
 | Speech-to-text on a WebRTC call | [WebRtcSttE2eIT] | A browser speaking into a participant with VAD, turn detection and STT: wait for `capabilities().stt.state` to be `ready`, subscribe before answering, then read the words from `EndOfTurn.text` and `TranscriptEvent.Turn`, joining turns (a turn that ran out of drain time hands its last words to the next) |
@@ -582,6 +704,7 @@ their javadoc. `capabilities()` is covered by the licensing tour.
 [AgentStreamIT]: jsyn/src/test/java/com/synauson/jsyn/it/AgentStreamIT.java
 [AgentTurnsIT]: jsyn/src/test/java/com/synauson/jsyn/it/AgentTurnsIT.java
 [AgentWordsIT]: jsyn/src/test/java/com/synauson/jsyn/it/AgentWordsIT.java
+[AgentSpeakIT]: jsyn/src/test/java/com/synauson/jsyn/it/AgentSpeakIT.java
 [ModelStoreIT]: jsyn/src/test/java/com/synauson/jsyn/it/ModelStoreIT.java
 [SipParticipantIT]: jsyn/src/test/java/com/synauson/jsyn/it/SipParticipantIT.java
 [SipMediaE2eIT]: jsyn/src/test/java/com/synauson/jsyn/it/SipMediaE2eIT.java
@@ -610,7 +733,7 @@ The tests show one feature at a time. For whole applications you can run and ada
 ## Configuration and logging
 
 Set runtime options on `JSynConfig.builder()`; its javadoc lists every option with its
-default. The STT options:
+default. The STT and TTS options:
 
 | Option | Default | Effect |
 |---|---|---|
@@ -619,6 +742,7 @@ default. The STT options:
 | `memoryBudget(Long)` | the cgroup's limit | Bytes of memory this runtime may use; STT sizes its workers within it |
 | `recalibrate(boolean)` | `false` | Time the models again at startup and replace the timings cached in `calibration.json` in the state directory. A restart otherwise reuses them on the same model, CPU, CPU budget and ONNX Runtime version. Set it after changing hardware in place or to take fresh timings on an idle host. `capabilities().calibration` and `stt.source` report where each timing came from. Natives that predate the cache ignore it. |
 | `sttTurnFlush(Boolean)` | off | Close each turn's transcript on a forecast of its last words as soon as turn detection ends the turn, rather than waiting for the transcription to get there. On a Ryzen 7 3700X it closed long turns about 130 ms sooner for about 26% more CPU, and the decoding it sets aside lowers the STT stream cap by about a quarter. `capabilities().stt.turnFlush` and `forecastReserve` report it. Natives that predate it ignore it. |
+| `ttsCapacity(workers, threads, maxStreams)` | from the CPU count | The TTS pool's workers, ONNX Runtime threads per worker, and the cap on utterances synthesised at once; `maxStreams` 0 turns TTS off. By default a quarter of the logical CPUs go to TTS, with 2 threads a worker when that is two or more, 1 to 4 workers and 2 utterances a worker. The cap counts utterances while they play, not speakers. `capabilities().tts` reports it. |
 
 The engine also reads these environment variables:
 

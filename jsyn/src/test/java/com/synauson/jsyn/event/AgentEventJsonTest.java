@@ -5,11 +5,14 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.synauson.jsyn.AgentStreamOptions;
 import com.synauson.jsyn.AppliedTurnConfig;
+import com.synauson.jsyn.CancelledUtterance;
 import com.synauson.jsyn.TurnConfig;
 import com.synauson.jsyn.exception.AgentStreamException;
 import com.synauson.jsyn.exception.InvalidArgumentException;
 import com.synauson.jsyn.spec.TurnDetectionConfig;
+import com.synauson.jsyn.spec.Speak;
 import com.synauson.jsyn.spec.TurnConfigUpdate;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -53,6 +56,14 @@ class AgentEventJsonTest {
         AgentEvent.Subscribed older = assertInstanceOf(AgentEvent.Subscribed.class,
             parse(0, "\"type\":\"subscribed\",\"oldestSeq\":0,\"lastSeq\":0,\"stt\":false"));
         assertNull(older.turnConfig, "an engine before turn events");
+        assertFalse(older.tts, "an engine before the speaker");
+        assertNull(older.voice);
+        AgentEvent.Subscribed speaking = assertInstanceOf(AgentEvent.Subscribed.class,
+            parse(0, "\"type\":\"subscribed\",\"oldestSeq\":1,\"lastSeq\":4,\"stt\":true,"
+                + "\"tts\":true,\"turnConfig\":" + CONFIG + ",\"voice\":\"en-us-f1\""));
+        assertTrue(speaking.tts);
+        assertEquals("en-us-f1", speaking.voice);
+        assertFalse(sub.tts, "no tts key: an engine before the speaker");
 
         AgentEvent.Heartbeat beat = assertInstanceOf(AgentEvent.Heartbeat.class,
             parse(4, "\"type\":\"heartbeat\",\"conferenceMs\":12000,"
@@ -137,6 +148,121 @@ class AgentEventJsonTest {
         AgentEvent.TurnConfigUpdated updated = assertInstanceOf(AgentEvent.TurnConfigUpdated.class,
             parse(5, "\"type\":\"turnConfigUpdated\",\"config\":" + CONFIG));
         assertConfig(updated.config);
+    }
+
+    @Test
+    void readsThePlaybackEvents() {
+        AgentEvent.UtteranceStarted started = assertInstanceOf(AgentEvent.UtteranceStarted.class,
+            parse(6, "\"type\":\"utteranceStarted\",\"utteranceId\":\"u1\",\"atMs\":9000,"
+                + "\"timeToFirstAudioMs\":310,\"egressDelayMs\":40"));
+        assertEquals("u1", started.utteranceId);
+        assertEquals(9000, started.atMs);
+        assertEquals(310, started.timeToFirstAudioMs);
+        assertEquals(Long.valueOf(40), started.egressDelayMs);
+        assertTrue(started.isStored());
+        AgentEvent.UtteranceStarted noMixer = assertInstanceOf(AgentEvent.UtteranceStarted.class,
+            parse(6, "\"type\":\"utteranceStarted\",\"utteranceId\":\"u1\",\"atMs\":1,"
+                + "\"timeToFirstAudioMs\":1"));
+        assertNull(noMixer.egressDelayMs, "absent without a mixer to its participant");
+
+        AgentEvent.WordsPlayed played = assertInstanceOf(AgentEvent.WordsPlayed.class,
+            parse(7, "\"type\":\"wordsPlayed\",\"utteranceId\":\"u1\",\"words\":[{\"text\":\"Hello,\","
+                + "\"textStart\":0,\"textEnd\":6,\"startMs\":25,\"endMs\":410}]"));
+        assertEquals("u1", played.utteranceId);
+        assertEquals(1, played.words.size());
+        PlayedWord hello = played.words.get(0);
+        assertEquals("Hello,", hello.text);
+        assertEquals(0, hello.textStart);
+        assertEquals(6, hello.textEnd);
+        assertEquals(25, hello.startMs);
+        assertEquals(410, hello.endMs);
+
+        AgentEvent.UtteranceDone done = assertInstanceOf(AgentEvent.UtteranceDone.class,
+            parse(8, "\"type\":\"utteranceDone\",\"utteranceId\":\"u1\",\"audioMs\":1200,"
+                + "\"atMs\":10200,\"underrunMs\":0"));
+        assertEquals("u1", done.utteranceId);
+        assertEquals(1200, done.audioMs);
+        assertEquals(10200, done.atMs);
+        assertEquals(0, done.underrunMs);
+
+        AgentEvent.UtteranceInterrupted cut = assertInstanceOf(AgentEvent.UtteranceInterrupted.class,
+            parse(9, "\"type\":\"utteranceInterrupted\",\"utteranceId\":\"u2\","
+                + "\"reason\":\"CANCELLED\",\"heardText\":\"Hello,\",\"heardTextEnd\":6,"
+                + "\"heardMs\":520"));
+        assertEquals("u2", cut.utteranceId);
+        assertEquals(AgentEvent.UtteranceInterrupted.CANCELLED, cut.reason);
+        assertEquals("Hello,", cut.heardText);
+        assertEquals(6, cut.heardTextEnd);
+        assertEquals(520, cut.heardMs);
+        for (String reason : new String[] {"PREEMPTED", "STREAM_ENDED"}) {
+            AgentEvent.UtteranceInterrupted i = assertInstanceOf(AgentEvent.UtteranceInterrupted.class,
+                parse(9, "\"type\":\"utteranceInterrupted\",\"utteranceId\":\"u\",\"reason\":\""
+                    + reason + "\",\"heardText\":\"\",\"heardTextEnd\":0,\"heardMs\":0"));
+            assertEquals(reason, i.reason);
+        }
+        assertEquals("PREEMPTED", AgentEvent.UtteranceInterrupted.PREEMPTED);
+        assertEquals("STREAM_ENDED", AgentEvent.UtteranceInterrupted.STREAM_ENDED);
+
+        AgentEvent.UtteranceFailed failed = assertInstanceOf(AgentEvent.UtteranceFailed.class,
+            parse(10, "\"type\":\"utteranceFailed\",\"utteranceId\":\"u3\","
+                + "\"code\":\"TTS_CAPACITY\",\"message\":\"full\""));
+        assertEquals("u3", failed.utteranceId);
+        assertEquals(AgentEvent.UtteranceFailed.TTS_CAPACITY, failed.code);
+        assertEquals("full", failed.message);
+        assertEquals("TTS_UNAVAILABLE", AgentEvent.UtteranceFailed.TTS_UNAVAILABLE);
+        assertEquals("SYNTHESIS_FAILED", AgentEvent.UtteranceFailed.SYNTHESIS_FAILED);
+        assertEquals("UNSPEAKABLE_TEXT", AgentEvent.UtteranceFailed.UNSPEAKABLE_TEXT);
+    }
+
+    @Test
+    void wordOffsetsAreCodePoints() {
+        // One emoji is two UTF-16 chars and one code point.
+        String text = "Hi \uD83D\uDE00 there, friend.";
+        AgentEvent.WordsPlayed played = assertInstanceOf(AgentEvent.WordsPlayed.class,
+            parse(7, "\"type\":\"wordsPlayed\",\"utteranceId\":\"u\",\"words\":["
+                + "{\"text\":\"there,\",\"textStart\":5,\"textEnd\":11,\"startMs\":0,\"endMs\":1},"
+                + "{\"text\":\"friend.\",\"textStart\":12,\"textEnd\":19,\"startMs\":1,\"endMs\":2}]"));
+        for (PlayedWord w : played.words) {
+            assertEquals(w.text, text.substring(w.charStart(text), w.charEnd(text)), w.toString());
+        }
+        assertEquals(6, played.words.get(0).charStart(text), "one past the emoji's two chars");
+        assertEquals(text.length(), played.words.get(1).charEnd(text));
+    }
+
+    @Test
+    void speakerCommandsReadAndWriteTheEnginesJson() {
+        Gson gson = new Gson();
+        JsonObject full = JsonParser.parseString(gson.toJson(Speak.builder()
+            .utteranceId("u1").text("Hi.").release(Speak.Release.END)
+            .interruptible(false).preemptible(true).voice("en-us-m1").speed(1.25f)
+            .build())).getAsJsonObject();
+        assertEquals("u1", full.get("utteranceId").getAsString());
+        assertEquals("Hi.", full.get("text").getAsString());
+        assertEquals("END", full.get("release").getAsString());
+        assertFalse(full.get("interruptible").getAsBoolean());
+        assertTrue(full.get("preemptible").getAsBoolean());
+        assertEquals("en-us-m1", full.get("voice").getAsString());
+        assertEquals(1.25f, full.get("speed").getAsFloat(), 1e-6);
+        assertEquals(7, full.size(), full.toString());
+
+        assertEquals("{\"utteranceId\":\"u2\",\"text\":\"more\",\"release\":\"NONE\"}",
+            gson.toJson(Speak.builder().utteranceId("u2").text("more").build()),
+            "unset options are left out");
+        assertEquals("FLUSH", JsonParser.parseString(gson.toJson(Speak.builder().utteranceId("u")
+            .release(Speak.Release.FLUSH).build())).getAsJsonObject().get("release").getAsString());
+        Speak whole = Speak.complete("u3", "Thank you.");
+        assertEquals(Speak.Release.END, whole.release);
+        assertEquals("Thank you.", whole.text);
+        assertThrows(InvalidArgumentException.class, () -> Speak.builder().text("x").build());
+
+        List<CancelledUtterance> cancelled = CancelledUtterance.listFromJson("{\"cancelled\":["
+            + "{\"utteranceId\":\"u1\",\"heardText\":\"Hello,\",\"heardMs\":640,\"seq\":12}]}");
+        assertEquals(1, cancelled.size());
+        assertEquals("u1", cancelled.get(0).utteranceId);
+        assertEquals("Hello,", cancelled.get(0).heardText);
+        assertEquals(640, cancelled.get(0).heardMs);
+        assertEquals(12, cancelled.get(0).seq);
+        assertTrue(CancelledUtterance.listFromJson("{\"cancelled\":[]}").isEmpty());
     }
 
     /** A word as the engine sends it. */

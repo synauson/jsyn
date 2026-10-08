@@ -17,16 +17,36 @@ import org.jspecify.annotations.Nullable;
  * {@link com.synauson.jsyn.participant.Conference#streamAgentEvents}. The subclasses
  * are the event kinds: {@link Subscribed}, {@link Heartbeat}, {@link Error},
  * {@link StreamEnded}, {@link SpeechStarted}, {@link SpeechStopped},
- * {@link TurnStarted}, {@link TurnWords}, {@link EndOfTurn} and
- * {@link TurnConfigUpdated}. The engine adds kinds over time (eager end of turn comes
- * next); an older jsyn receives those as {@link Unknown}, so handle the kinds you know
- * and ignore the rest.
+ * {@link TurnStarted}, {@link TurnWords}, {@link EndOfTurn}, {@link TurnConfigUpdated},
+ * and, for a participant with a speaker, {@link UtteranceStarted}, {@link WordsPlayed},
+ * {@link UtteranceDone}, {@link UtteranceInterrupted} and {@link UtteranceFailed}. The
+ * engine adds kinds over time (eager end of turn comes next); an older jsyn receives
+ * those as {@link Unknown}, so handle the kinds you know and ignore the rest.
  *
  * <p><b>Turns.</b> Turn ids rise by one from 1. Each {@link TurnStarted} is followed by
  * exactly one {@link EndOfTurn} for it, and no event of a turn comes before the
  * previous turn's {@code EndOfTurn}. {@link SpeechStarted} and {@link SpeechStopped}
  * carry no turn and come at once. With STT a turn starts with its first word, and its
  * {@link TurnWords}, in order, are exactly its {@code EndOfTurn}'s words.
+ *
+ * <p><b>Playback.</b> With a speaker
+ * ({@link com.synauson.jsyn.spec.TtsConfig}), every utterance that plays any audio gets
+ * one {@link UtteranceStarted}, then its {@link WordsPlayed}, then exactly one of
+ * {@link UtteranceDone}, {@link UtteranceInterrupted} or {@link UtteranceFailed}; none of
+ * its events follows that. One cancelled or failed before any of its audio played gets
+ * only its {@code UtteranceInterrupted} or {@code UtteranceFailed}. Utterances play one
+ * after another in the order they were started; match events to utterances by
+ * {@code utteranceId}. "Played" means the audio passed the
+ * speaker's clock-synced point, the last place the engine can still stop it, so
+ * {@link UtteranceInterrupted#heardText} is exact.
+ *
+ * <p><b>Text offsets are Unicode code points.</b> {@link PlayedWord#textStart},
+ * {@link PlayedWord#textEnd} and {@link UtteranceInterrupted#heardTextEnd} count code
+ * points of the utterance's text (everything its Speaks sent, concatenated), while a
+ * Java {@code String} indexes UTF-16 chars: text outside the Basic Multilingual Plane,
+ * such as an emoji, takes two chars and one code point. Convert with
+ * {@link PlayedWord#charStart(String)} and {@link PlayedWord#charEnd(String)}, which use
+ * {@link String#offsetByCodePoints}; {@code heardText.length()} is already a char index.
  *
  * <p><b>Ordering and resume.</b> Every subscriber sees one order. {@link #seq} rises by
  * one with each stored event, from 1. {@link Subscribed} and {@link Heartbeat} belong to
@@ -99,6 +119,11 @@ public abstract class AgentEvent {
             case "turnWords": return new TurnWords(o);
             case "endOfTurn": return new EndOfTurn(o);
             case "turnConfigUpdated": return new TurnConfigUpdated(o);
+            case "utteranceStarted": return new UtteranceStarted(o);
+            case "wordsPlayed": return new WordsPlayed(o);
+            case "utteranceDone": return new UtteranceDone(o);
+            case "utteranceInterrupted": return new UtteranceInterrupted(o);
+            case "utteranceFailed": return new UtteranceFailed(o);
             default: return new Unknown(o, type, json);
         }
     }
@@ -118,6 +143,11 @@ public abstract class AgentEvent {
         return e == null || e.isJsonNull() ? null : e.getAsLong();
     }
 
+    static @Nullable String optionalString(JsonObject o, String key) {
+        JsonElement e = o.get(key);
+        return e == null || e.isJsonNull() ? null : e.getAsString();
+    }
+
     static boolean bool(JsonObject o, String key) {
         JsonElement e = o.get(key);
         return e != null && !e.isJsonNull() && e.getAsBoolean();
@@ -133,6 +163,19 @@ public abstract class AgentEvent {
         public final boolean stt;
         /** The turn config in effect; null from an engine older than turn events. */
         public final @Nullable TurnConfig turnConfig;
+        /**
+         * Whether the participant has a speaker ({@link com.synauson.jsyn.spec.TtsConfig});
+         * false from an engine older than the speaker.
+         *
+         * @since 1.6.0
+         */
+        public final boolean tts;
+        /**
+         * The speaker's default voice; null without a speaker.
+         *
+         * @since 1.6.0
+         */
+        public final @Nullable String voice;
 
         Subscribed(JsonObject o) {
             super(o);
@@ -140,6 +183,8 @@ public abstract class AgentEvent {
             this.lastSeq = number(o, "lastSeq");
             this.stt = bool(o, "stt");
             this.turnConfig = TurnConfig.fromJson(o.get("turnConfig"));
+            this.tts = bool(o, "tts");
+            this.voice = optionalString(o, "voice");
         }
 
         @Override
@@ -380,6 +425,160 @@ public abstract class AgentEvent {
         TurnConfigUpdated(JsonObject o) {
             super(o);
             this.config = TurnConfig.fromJson(o.get("config"));
+        }
+    }
+
+    /**
+     * The speaker's first sample of an utterance played into the call. Exactly one per
+     * utterance that plays any audio, before its {@link WordsPlayed}.
+     *
+     * @since 1.6.0
+     */
+    public static final class UtteranceStarted extends AgentEvent {
+        /** The utterance, as given to {@code speak}. */
+        public final String utteranceId;
+        /**
+         * Conference time its first sample passed the speaker's clock-synced point, the
+         * last place the engine can still stop it.
+         */
+        public final long atMs;
+        /** From the utterance's first {@code speak} to {@link #atMs}, in ms (a duration). */
+        public final long timeToFirstAudioMs;
+        /**
+         * The latency of the mixer the speaker plays to its participant through, in ms:
+         * about how much later than {@link #atMs} the audio leaves the engine (the
+         * network and the far end's jitter buffer come on top). Null when the speaker
+         * plays through no mixer of its participant.
+         */
+        public final @Nullable Long egressDelayMs;
+
+        UtteranceStarted(JsonObject o) {
+            super(o);
+            this.utteranceId = string(o, "utteranceId");
+            this.atMs = number(o, "atMs");
+            this.timeToFirstAudioMs = number(o, "timeToFirstAudioMs");
+            this.egressDelayMs = optionalNumber(o, "egressDelayMs");
+        }
+    }
+
+    /**
+     * More of an utterance's words fully played, in order. An utterance's
+     * {@code WordsPlayed}, joined, are the words of its text that were heard; none follows
+     * its {@link UtteranceDone}, {@link UtteranceInterrupted} or {@link UtteranceFailed}.
+     *
+     * @since 1.6.0
+     */
+    public static final class WordsPlayed extends AgentEvent {
+        /** The utterance they belong to. */
+        public final String utteranceId;
+        /** The words, in order. */
+        public final List<PlayedWord> words;
+
+        WordsPlayed(JsonObject o) {
+            super(o);
+            this.utteranceId = string(o, "utteranceId");
+            this.words = PlayedWord.listFromJson(o.get("words"));
+        }
+    }
+
+    /**
+     * An utterance played into the call to its end.
+     *
+     * @since 1.6.0
+     */
+    public static final class UtteranceDone extends AgentEvent {
+        /** The utterance. */
+        public final String utteranceId;
+        /** Its audio's length, in ms (a duration). */
+        public final long audioMs;
+        /** Conference time its last sample played. */
+        public final long atMs;
+        /**
+         * Silence inside it while synthesis fell behind playback, in ms (a duration): dead
+         * air the caller heard.
+         */
+        public final long underrunMs;
+
+        UtteranceDone(JsonObject o) {
+            super(o);
+            this.utteranceId = string(o, "utteranceId");
+            this.audioMs = number(o, "audioMs");
+            this.atMs = number(o, "atMs");
+            this.underrunMs = number(o, "underrunMs");
+        }
+    }
+
+    /**
+     * An utterance stopped before its end; nothing more of it plays.
+     *
+     * @since 1.6.0
+     */
+    public static final class UtteranceInterrupted extends AgentEvent {
+        /** {@code cancelUtterance} stopped it. */
+        public static final String CANCELLED = "CANCELLED";
+        /** A new utterance started while it was preemptible. */
+        public static final String PREEMPTED = "PREEMPTED";
+        /**
+         * The participant or conference went; comes before the stream's
+         * {@link StreamEnded}.
+         */
+        public static final String STREAM_ENDED = "STREAM_ENDED";
+
+        /** The utterance. */
+        public final String utteranceId;
+        /** Why: {@link #CANCELLED}, {@link #PREEMPTED}, {@link #STREAM_ENDED}, or a newer reason. */
+        public final String reason;
+        /**
+         * The utterance's text up to the end of its last fully played word: what the
+         * caller heard, as it was sent. A prefix of the text, so {@code heardText.length()}
+         * is the char index where the unheard text starts.
+         */
+        public final String heardText;
+        /** {@link #heardText}'s length in Unicode code points (not chars). */
+        public final long heardTextEnd;
+        /** How much of its audio played, in ms (a duration), partly heard words included. */
+        public final long heardMs;
+
+        UtteranceInterrupted(JsonObject o) {
+            super(o);
+            this.utteranceId = string(o, "utteranceId");
+            this.reason = string(o, "reason");
+            this.heardText = string(o, "heardText");
+            this.heardTextEnd = number(o, "heardTextEnd");
+            this.heardMs = number(o, "heardMs");
+        }
+    }
+
+    /**
+     * An utterance failed; nothing more of it plays.
+     *
+     * @since 1.6.0
+     */
+    public static final class UtteranceFailed extends AgentEvent {
+        /** The speaker's TTS engine is gone. */
+        public static final String TTS_UNAVAILABLE = "TTS_UNAVAILABLE";
+        /** The model failed on its text. */
+        public static final String SYNTHESIS_FAILED = "SYNTHESIS_FAILED";
+        /** Its text has nothing to say, or a word too long for the model. */
+        public static final String UNSPEAKABLE_TEXT = "UNSPEAKABLE_TEXT";
+        /** This machine's TTS capacity was in use when it was to start. */
+        public static final String TTS_CAPACITY = "TTS_CAPACITY";
+
+        /** The utterance. */
+        public final String utteranceId;
+        /**
+         * Why: {@link #TTS_UNAVAILABLE}, {@link #SYNTHESIS_FAILED},
+         * {@link #UNSPEAKABLE_TEXT}, {@link #TTS_CAPACITY}, or a newer code.
+         */
+        public final String code;
+        /** Human-readable description. */
+        public final String message;
+
+        UtteranceFailed(JsonObject o) {
+            super(o);
+            this.utteranceId = string(o, "utteranceId");
+            this.code = string(o, "code");
+            this.message = string(o, "message");
         }
     }
 

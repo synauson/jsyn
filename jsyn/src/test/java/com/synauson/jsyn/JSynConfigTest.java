@@ -62,6 +62,19 @@ class JSynConfigTest {
     }
 
     @Test
+    void ttsCapacityIsSentOnlyWhenSet() {
+        String json = JSynConfig.builder().ttsCapacity(1, 2, 0).build().toJson();
+        assertTrue(json.contains("\"ttsWorkers\":1"), json);
+        assertTrue(json.contains("\"ttsThreads\":2"), json);
+        assertTrue(json.contains("\"maxTtsStreams\":0"), json);
+        String partial = JSynConfig.builder().ttsCapacity(null, null, 6).build().toJson();
+        assertFalse(partial.contains("ttsWorkers"), partial);
+        assertTrue(partial.contains("\"maxTtsStreams\":6"), partial);
+        String dflt = JSynConfig.builder().build().toJson();
+        assertFalse(dflt.contains("Tts") || dflt.contains("tts"), "unset TTS capacity is omitted: " + dflt);
+    }
+
+    @Test
     void sttTurnFlushIsSentOnlyWhenSet() {
         String on = JSynConfig.builder().sttTurnFlush(true).build().toJson();
         assertTrue(on.contains("\"sttTurnFlush\":true"), on);

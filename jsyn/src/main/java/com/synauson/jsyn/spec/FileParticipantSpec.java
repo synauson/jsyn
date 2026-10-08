@@ -46,6 +46,19 @@ public final class FileParticipantSpec {
      */
     public final @Nullable SttConfig stt;
 
+    /**
+     * Optional speaker (text-to-speech) for
+     * {@link com.synauson.jsyn.participant.Conference#speak}; {@code null} gives the
+     * participant none. Needs {@link #turnDetection} on the same participant: a speaker
+     * without it is refused with an
+     * {@link com.synauson.jsyn.exception.InvalidArgumentException}. A file participant
+     * has no output, so its speaker plays only where it is routed
+     * ({@link TtsConfig#speakerId}).
+     *
+     * @since 1.6.0
+     */
+    public final @Nullable TtsConfig tts;
+
     private FileParticipantSpec(Builder b) {
         this.id = Args.notNull(b.id, "id");
         this.uri = Args.notNull(b.uri, "uri");
@@ -53,6 +66,7 @@ public final class FileParticipantSpec {
         this.vad = b.vad;
         this.turnDetection = b.turnDetection;
         this.stt = b.stt;
+        this.tts = b.tts;
     }
 
     /**
@@ -74,6 +88,7 @@ public final class FileParticipantSpec {
         private @Nullable VadConfig vad;
         private @Nullable TurnDetectionConfig turnDetection;
         private @Nullable SttConfig stt;
+        private @Nullable TtsConfig tts;
 
         /**
          * Set the participant ID. Required.
@@ -126,6 +141,17 @@ public final class FileParticipantSpec {
          * @since 1.6.0
          */
         public Builder stt(@Nullable SttConfig stt) { this.stt = stt; return this; }
+
+        /**
+         * Give this participant a speaker: {@link com.synauson.jsyn.participant.Conference#speak}
+         * sends text-to-speech into the call, and its playback is reported on the
+         * participant's agent stream. Needs {@link #turnDetection}.
+         *
+         * @param tts TTS configuration, or {@code null} for no speaker
+         * @return this builder
+         * @since 1.6.0
+         */
+        public Builder tts(@Nullable TtsConfig tts) { this.tts = tts; return this; }
 
         /**
          * Materialise an immutable {@link FileParticipantSpec}.

@@ -81,8 +81,9 @@ final class JSynTestHelpers {
 
     /**
      * Create a new JSyn instance allocating RTP ports from {@code [rtpMin, rtpMin + 199]}.
-     * STT is off: a runtime licensed for it otherwise loads and times the STT model in
-     * the background. Tests that decode speech use {@link #newJSynWithStt()}.
+     * STT and TTS are off: a runtime licensed for them otherwise loads their models in
+     * the background. Tests that decode speech use {@link #newJSynWithStt()}, tests that
+     * speak {@link #newJSynWithTts()}.
      */
     static JSyn newJSyn(int rtpMin) {
         return new JSyn(JSynConfig.builder()
@@ -90,6 +91,7 @@ final class JSynTestHelpers {
                 .rtpPortMin(rtpMin)
                 .rtpPortMax(rtpMin + 199)
                 .sttCapacity(null, null, 0)
+                .ttsCapacity(null, null, 0)
                 .build());
     }
 
@@ -105,7 +107,51 @@ final class JSynTestHelpers {
                 .rtpPortMin(rtpMin)
                 .rtpPortMax(rtpMin + 199)
                 .sttCapacity(1, 4, 2)
+                .ttsCapacity(null, null, 0)
                 .build());
+    }
+
+    /**
+     * Create a JSyn instance with TTS on (one synthesis worker of two threads, four
+     * utterances at once) and STT off. The engine still loads in the background; wait
+     * for it with {@link #awaitTtsReady}.
+     */
+    static JSyn newJSynWithTts() {
+        int rtpMin = nextRtpPortMin();
+        return new JSyn(JSynConfig.builder()
+                .modelStore(modelStore().toString())
+                .rtpPortMin(rtpMin)
+                .rtpPortMax(rtpMin + 199)
+                .sttCapacity(null, null, 0)
+                .ttsCapacity(1, 2, 4)
+                .build());
+    }
+
+    /**
+     * Wait until {@code capabilities().tts.state} is {@code "ready"}: adding a participant
+     * with a speaker before then throws, and closing a runtime while the engine loads can
+     * crash ONNX Runtime. Fails if it fails, or isn't ready in time ({@code idle} says
+     * why: no license yet, or no lettura in the store).
+     */
+    static void awaitTtsReady(JSyn syn, java.time.Duration within) throws InterruptedException {
+        long deadline = System.nanoTime() + within.toNanos();
+        while (true) {
+            com.synauson.jsyn.Capabilities.TtsCapacity tts = syn.capabilities().tts;
+            if (tts == null) {
+                throw new IllegalStateException("the native runtime reports no TTS");
+            }
+            if ("ready".equals(tts.state)) {
+                return;
+            }
+            if ("failed".equals(tts.state)) {
+                throw new IllegalStateException("TTS failed: " + tts.detail);
+            }
+            if (System.nanoTime() > deadline) {
+                throw new IllegalStateException("TTS not ready within " + within + ": "
+                        + tts.state + " (" + tts.detail + ")");
+            }
+            Thread.sleep(200);
+        }
     }
 
     /**

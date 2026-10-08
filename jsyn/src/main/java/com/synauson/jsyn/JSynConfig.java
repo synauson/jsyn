@@ -158,6 +158,29 @@ public final class JSynConfig {
      */
     public final @Nullable Boolean sttTurnFlush;
 
+    /**
+     * TTS synthesis workers, each holding its own session of the model. {@code null}:
+     * from the CPU count (see {@link Capabilities#tts}).
+     *
+     * @since 1.6.0
+     */
+    public final @Nullable Integer ttsWorkers;
+
+    /**
+     * ONNX Runtime threads per TTS worker. {@code null}: from the CPU count.
+     *
+     * @since 1.6.0
+     */
+    public final @Nullable Integer ttsThreads;
+
+    /**
+     * Utterances this runtime synthesises at once; 0 turns TTS off. {@code null}: 2 per
+     * worker.
+     *
+     * @since 1.6.0
+     */
+    public final @Nullable Integer maxTtsStreams;
+
     private JSynConfig(Builder b) {
         this.modelStore = b.modelStore;
         this.licenseKey = b.licenseKey;
@@ -180,6 +203,9 @@ public final class JSynConfig {
         this.cpuBudget = b.cpuBudget;
         this.memoryBudget = b.memoryBudget;
         this.sttTurnFlush = b.sttTurnFlush;
+        this.ttsWorkers = b.ttsWorkers;
+        this.ttsThreads = b.ttsThreads;
+        this.maxTtsStreams = b.maxTtsStreams;
     }
 
     /**
@@ -229,6 +255,9 @@ public final class JSynConfig {
         private @Nullable Double cpuBudget;
         private @Nullable Long memoryBudget;
         private @Nullable Boolean sttTurnFlush;
+        private @Nullable Integer ttsWorkers;
+        private @Nullable Integer ttsThreads;
+        private @Nullable Integer maxTtsStreams;
 
         /**
          * Override the STT pool's calibrated shape and stream cap. Each {@code null}
@@ -298,6 +327,27 @@ public final class JSynConfig {
          */
         public Builder sttTurnFlush(@Nullable Boolean on) {
             this.sttTurnFlush = on;
+            return this;
+        }
+
+        /**
+         * Override the TTS pool's shape and its cap on utterances synthesised at once.
+         * Each {@code null} keeps the default, which comes from the CPU count: a quarter
+         * of the logical CPUs for TTS, 2 threads a worker when that is two CPUs or more,
+         * 1 to 4 workers, and 2 utterances a worker. The cap counts utterances while they
+         * are synthesised and played, not speakers. Natives without TTS ignore it.
+         *
+         * @param workers    synthesis workers (at least 1), or {@code null}
+         * @param threads    ONNX Runtime threads per worker (at least 1), or {@code null}
+         * @param maxStreams utterances synthesised at once (0 turns TTS off), or {@code null}
+         * @return this builder
+         * @since 1.6.0
+         */
+        public Builder ttsCapacity(@Nullable Integer workers, @Nullable Integer threads,
+                                   @Nullable Integer maxStreams) {
+            this.ttsWorkers = workers;
+            this.ttsThreads = threads;
+            this.maxTtsStreams = maxStreams;
             return this;
         }
 

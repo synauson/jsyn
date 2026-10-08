@@ -107,6 +107,17 @@ public final class WebRtcParticipantSpec {
      */
     public final @Nullable SttConfig stt;
 
+    /**
+     * Optional speaker (text-to-speech) for
+     * {@link com.synauson.jsyn.participant.Conference#speak}; {@code null} gives the
+     * participant none. Needs {@link #turnDetection} on the same participant: a speaker
+     * without it is refused with an
+     * {@link com.synauson.jsyn.exception.InvalidArgumentException}.
+     *
+     * @since 1.6.0
+     */
+    public final @Nullable TtsConfig tts;
+
     private WebRtcParticipantSpec(Builder b) {
         this.participantId = Args.notNull(b.participantId, "participantId");
         this.sdpOffer = Args.notNull(b.sdpOffer, "sdpOffer");
@@ -125,6 +136,7 @@ public final class WebRtcParticipantSpec {
         this.vad = b.vad;
         this.turnDetection = b.turnDetection;
         this.stt = b.stt;
+        this.tts = b.tts;
     }
 
     /**
@@ -156,6 +168,7 @@ public final class WebRtcParticipantSpec {
         private @Nullable VadConfig vad;
         private @Nullable TurnDetectionConfig turnDetection;
         private @Nullable SttConfig stt;
+        private @Nullable TtsConfig tts;
 
         /**
          * Set the participant ID. Required.
@@ -304,6 +317,17 @@ public final class WebRtcParticipantSpec {
          * @since 1.6.0
          */
         public Builder stt(@Nullable SttConfig stt) { this.stt = stt; return this; }
+
+        /**
+         * Give this participant a speaker: {@link com.synauson.jsyn.participant.Conference#speak}
+         * sends text-to-speech into the call, and its playback is reported on the
+         * participant's agent stream. Needs {@link #turnDetection}.
+         *
+         * @param tts TTS configuration, or {@code null} for no speaker
+         * @return this builder
+         * @since 1.6.0
+         */
+        public Builder tts(@Nullable TtsConfig tts) { this.tts = tts; return this; }
 
         /**
          * Materialise an immutable {@link WebRtcParticipantSpec}.

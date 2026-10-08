@@ -362,6 +362,34 @@ public final class NativeBridge {
                                                  String updateJson);
 
     /**
+     * Start or continue an utterance on a participant's speaker.
+     *
+     * @param handle      runtime handle
+     * @param confId      conference identifier
+     * @param pid         participant identifier
+     * @param requestJson a {@code Speak} as JSON (camelCase keys:
+     *                    {@code {"utteranceId","text","release":"NONE"|"FLUSH"|"END",
+     *                    "interruptible"?,"preemptible"?,"voice"?,"speed"?}})
+     * @return JSON {@code {"utteranceId":"...","created":bool}}
+     * @since 1.6.0
+     */
+    public static native String speak(long handle, String confId, String pid, String requestJson);
+
+    /**
+     * Cancel one utterance of a participant's speaker, or every interruptible one.
+     *
+     * @param handle      runtime handle
+     * @param confId      conference identifier
+     * @param pid         participant identifier
+     * @param requestJson {@code {"utteranceId":"..."}}, or {@code {}} for every
+     *                    interruptible utterance
+     * @return JSON {@code {"cancelled":[{"utteranceId","heardText","heardMs","seq"}]}}
+     * @since 1.6.0
+     */
+    public static native String cancelUtterance(long handle, String confId, String pid,
+                                                String requestJson);
+
+    /**
      * Subscribe to file playback events for a participant.
      *
      * @param handle   runtime handle

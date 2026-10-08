@@ -2,6 +2,7 @@ package com.synauson.jsyn.participant;
 
 import com.synauson.jsyn.AgentStreamOptions;
 import com.synauson.jsyn.AppliedTurnConfig;
+import com.synauson.jsyn.CancelledUtterance;
 import com.synauson.jsyn.ConferenceState;
 import com.synauson.jsyn.EventStreamObserver;
 import com.synauson.jsyn.ResourceSnapshot;
@@ -25,6 +26,7 @@ import com.synauson.jsyn.spec.RecordingParticipantSpec;
 import com.synauson.jsyn.spec.SipConnectionSpec;
 import com.synauson.jsyn.spec.SipParticipantSpec;
 import com.synauson.jsyn.spec.SipReservationSpec;
+import com.synauson.jsyn.spec.Speak;
 import com.synauson.jsyn.spec.TurnConfigUpdate;
 import com.synauson.jsyn.spec.WebRtcParticipantSpec;
 import com.google.gson.Gson;
@@ -562,6 +564,103 @@ public final class Conference extends NativeResource {
         String json = NativeBridge.updateTurnConfig(runtimeHandle, conferenceId, participantId,
             GSON.toJson(update));
         return AppliedTurnConfig.fromJson(json);
+    }
+
+    /**
+     * Send text to the participant's speaker: start an utterance (a new
+     * {@link Speak#utteranceId}) or add to an open one. Returns as soon as the speaker has
+     * the text; it never waits for synthesis, and a new utterance queues behind those
+     * still playing. Speech starts after a short first chunk (two words), then synthesis
+     * runs ahead of playback.
+     *
+     * <p>What plays is reported on the participant's agent stream
+     * ({@link #streamAgentEvents}): {@link AgentEvent.UtteranceStarted}, then
+     * {@link AgentEvent.WordsPlayed}, then one of {@link AgentEvent.UtteranceDone} (after
+     * a Speak with {@link Speak.Release#END}), {@link AgentEvent.UtteranceInterrupted} or
+     * {@link AgentEvent.UtteranceFailed}.
+     *
+     * <p>The reasoned errors lead their exception's message, such as
+     * {@code "TTS_REQUIRED: participant 'p' has no speaker: ..."}.
+     *
+     * @param participantId a participant added with a
+     *                      {@link com.synauson.jsyn.spec.TtsConfig}
+     * @param speak         the utterance id, text and options
+     * @return {@code true} if this Speak started the utterance, {@code false} if it added
+     *         to an open one
+     * @throws com.synauson.jsyn.exception.NativeResourceClosedException if this conference is closed
+     * @throws com.synauson.jsyn.exception.InvalidArgumentException if an argument is null,
+     *         or {@code INVALID_SPEAK}: an empty or overlong id, text over its cap, a voice
+     *         or speed after the utterance's first Speak, an unknown voice, a speed out of
+     *         range, or more than 64 utterances held
+     * @throws com.synauson.jsyn.exception.FailedPreconditionException
+     *         {@code TTS_REQUIRED} if the participant has no speaker, or
+     *         {@code UTTERANCE_ENDED} if the utterance was ended, or finished, was
+     *         interrupted or failed (utterance ids are not reused)
+     * @throws com.synauson.jsyn.exception.NotFoundException if there is no such participant
+     * @since 1.6.0
+     */
+    public boolean speak(String participantId, Speak speak) {
+        requireOpen();
+        Args.notNull(participantId, "participantId");
+        Args.notNull(speak, "speak");
+        String json = NativeBridge.speak(runtimeHandle, conferenceId, participantId,
+            GSON.toJson(speak));
+        JsonObject o = JsonParser.parseString(json).getAsJsonObject();
+        return o.has("created") && o.get("created").getAsBoolean();
+    }
+
+    /**
+     * Stop one of the participant's utterances, playing or queued. Its audio stops within
+     * one 20 ms buffer of the command reaching the conference, plus what the
+     * participant's mixer already holds (20 ms on SIP, 60 ms on WebRTC). Its
+     * {@link AgentEvent.UtteranceInterrupted} (reason {@code CANCELLED}) is on the agent
+     * stream before this returns.
+     *
+     * @param participantId a participant added with a
+     *                      {@link com.synauson.jsyn.spec.TtsConfig}
+     * @param utteranceId   the utterance to stop
+     * @return what the caller heard of it; empty when it had already finished
+     * @throws com.synauson.jsyn.exception.NativeResourceClosedException if this conference is closed
+     * @throws com.synauson.jsyn.exception.InvalidArgumentException if an argument is null
+     * @throws com.synauson.jsyn.exception.FailedPreconditionException
+     *         {@code TTS_REQUIRED} if the participant has no speaker, or
+     *         {@code UTTERANCE_NOT_INTERRUPTIBLE} if it was spoken with
+     *         {@link Speak#interruptible} false
+     * @throws com.synauson.jsyn.exception.NotFoundException {@code UNKNOWN_UTTERANCE} if
+     *         the speaker never had the utterance, or if there is no such participant
+     * @since 1.6.0
+     */
+    public List<CancelledUtterance> cancelUtterance(String participantId, String utteranceId) {
+        requireOpen();
+        Args.notNull(participantId, "participantId");
+        Args.notNull(utteranceId, "utteranceId");
+        JsonObject request = new JsonObject();
+        request.addProperty("utteranceId", utteranceId);
+        return CancelledUtterance.listFromJson(NativeBridge.cancelUtterance(runtimeHandle,
+            conferenceId, participantId, GSON.toJson(request)));
+    }
+
+    /**
+     * Stop every interruptible utterance of the participant, playing or queued: what an
+     * agent does when the caller barges in. Utterances spoken with
+     * {@link Speak#interruptible} false go on. See
+     * {@link #cancelUtterance(String, String)}.
+     *
+     * @param participantId a participant added with a
+     *                      {@link com.synauson.jsyn.spec.TtsConfig}
+     * @return what the caller heard of each, in order; empty when none was speaking
+     * @throws com.synauson.jsyn.exception.NativeResourceClosedException if this conference is closed
+     * @throws com.synauson.jsyn.exception.InvalidArgumentException if {@code participantId} is null
+     * @throws com.synauson.jsyn.exception.FailedPreconditionException
+     *         {@code TTS_REQUIRED} if the participant has no speaker
+     * @throws com.synauson.jsyn.exception.NotFoundException if there is no such participant
+     * @since 1.6.0
+     */
+    public List<CancelledUtterance> cancelUtterances(String participantId) {
+        requireOpen();
+        Args.notNull(participantId, "participantId");
+        return CancelledUtterance.listFromJson(NativeBridge.cancelUtterance(runtimeHandle,
+            conferenceId, participantId, "{}"));
     }
 
     /** Turns the engine's JSON strings into {@link AgentEvent}s for the caller's observer. */

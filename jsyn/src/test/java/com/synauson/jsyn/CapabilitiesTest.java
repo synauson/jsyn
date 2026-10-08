@@ -34,7 +34,9 @@ class CapabilitiesTest {
         + "\"memoryLimitBytes\":3221225472,\"memorySource\":\"auto\"},"
         + "\"calibration\":{\"file\":\"/var/lib/app/synauson/calibration.json\",\"recalibrate\":false,"
         + "\"vad\":{\"model\":\"sentito-1\",\"threads\":1,\"ms\":0.21,\"source\":\"cached\"},"
-        + "\"turnDetection\":null}"
+        + "\"turnDetection\":null},"
+        + "\"tts\":{\"state\":\"ready\",\"workers\":2,\"threadsPerWorker\":2,"
+        + "\"streams\":{\"limit\":4,\"inUse\":1},\"detail\":null}"
         + "}";
 
     // What natives before the session pool sent.
@@ -119,6 +121,31 @@ class CapabilitiesTest {
         assertEquals(0.21, c.calibration.vad.ms, 1e-9);
         assertEquals("cached", c.calibration.vad.source);
         assertNull(c.calibration.turnDetection, "not timed yet");
+
+        assertNotNull(c.tts);
+        assertEquals("ready", c.tts.state);
+        assertEquals(Integer.valueOf(2), c.tts.workers);
+        assertEquals(Integer.valueOf(2), c.tts.threadsPerWorker);
+        assertEquals(Integer.valueOf(4), c.tts.streams.limit);
+        assertEquals(1, c.tts.streams.inUse);
+        assertNull(c.tts.detail);
+    }
+
+    @Test
+    void anIdleTtsSaysWhy() {
+        String idle = JSON.replace("\"tts\":{\"state\":\"ready\",\"workers\":2,\"threadsPerWorker\":2,"
+                + "\"streams\":{\"limit\":4,\"inUse\":1},\"detail\":null}",
+            "\"tts\":{\"state\":\"idle\",\"workers\":1,\"threadsPerWorker\":1,"
+                + "\"streams\":{\"limit\":2,\"inUse\":0},\"detail\":\"no license for FEATURE_TTS\"}");
+        Capabilities c = Capabilities.fromJson(idle);
+        assertEquals("idle", c.tts.state);
+        assertEquals("no license for FEATURE_TTS", c.tts.detail);
+        assertEquals(0, c.tts.streams.inUse);
+    }
+
+    @Test
+    void nativesOlderThanTheSpeakerReportNoTtsCapacity() {
+        assertNull(Capabilities.fromJson(OLDER).tts);
     }
 
     @Test
