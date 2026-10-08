@@ -1,6 +1,7 @@
 package com.synauson.jsyn.participant;
 
 import com.synauson.jsyn.AgentStreamOptions;
+import com.synauson.jsyn.AppliedTurnConfig;
 import com.synauson.jsyn.ConferenceState;
 import com.synauson.jsyn.EventStreamObserver;
 import com.synauson.jsyn.ResourceSnapshot;
@@ -24,12 +25,14 @@ import com.synauson.jsyn.spec.RecordingParticipantSpec;
 import com.synauson.jsyn.spec.SipConnectionSpec;
 import com.synauson.jsyn.spec.SipParticipantSpec;
 import com.synauson.jsyn.spec.SipReservationSpec;
+import com.synauson.jsyn.spec.TurnConfigUpdate;
 import com.synauson.jsyn.spec.WebRtcParticipantSpec;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.OptionalLong;
 
 /**
  * Conference-scoped API handle.
@@ -451,8 +454,8 @@ public final class Conference extends NativeResource {
      * the cursor in {@code options} (all it keeps, its last 512, without one), then live
      * events, with an {@link AgentEvent.Heartbeat} whenever nothing else came for the
      * heartbeat interval. {@link AgentEvent.StreamEnded} is last, when the participant or
-     * the conference goes, and {@code onCompleted} follows. Turn events come in later
-     * releases and reach an older jsyn as {@link AgentEvent.Unknown}.
+     * the conference goes, and {@code onCompleted} follows. Kinds a newer engine adds
+     * (words, eager end of turn) reach this jsyn as {@link AgentEvent.Unknown}.
      *
      * <p><b>Lag and resume.</b> The observer runs on an engine thread and the engine never
      * waits for it: an observer 256 events behind is dropped, and {@code onError} gets an
@@ -504,6 +507,59 @@ public final class Conference extends NativeResource {
             options.afterSeq(), options.streamId(), options.heartbeatMs(),
             new AgentEventParser(observer));
         return new Subscription(subId);
+    }
+
+    /**
+     * End the participant's open voice-agent turn now. Its
+     * {@link AgentEvent.EndOfTurn} (reason {@code MANUAL}) follows on the agent stream: at
+     * once without STT; with STT once the turn's transcript settles, which the engine
+     * speeds up by forecasting its last words. If the participant is still speaking, the
+     * next turn starts at once.
+     *
+     * @param participantId a participant added with a
+     *                      {@link com.synauson.jsyn.spec.TurnDetectionConfig}
+     * @return the id of the turn that ends, or empty when no turn was open
+     * @throws com.synauson.jsyn.exception.NativeResourceClosedException if this conference is closed
+     * @throws com.synauson.jsyn.exception.InvalidArgumentException if {@code participantId} is null
+     * @throws com.synauson.jsyn.exception.FailedPreconditionException if the participant
+     *         has no turn detection
+     * @throws com.synauson.jsyn.exception.NotFoundException if there is no such participant
+     * @since 1.6.0
+     */
+    public OptionalLong forceEndTurn(String participantId) {
+        requireOpen();
+        Args.notNull(participantId, "participantId");
+        String json = NativeBridge.forceEndTurn(runtimeHandle, conferenceId, participantId);
+        JsonObject o = JsonParser.parseString(json).getAsJsonObject();
+        boolean ended = o.has("ended") && o.get("ended").getAsBoolean();
+        return ended && o.has("turnId") ? OptionalLong.of(o.get("turnId").getAsLong()) : OptionalLong.empty();
+    }
+
+    /**
+     * Change how the participant's voice-agent turns end. The fields set in
+     * {@code update} replace the current ones; a
+     * {@link AgentEvent.TurnConfigUpdated} announces the result on the agent stream. The
+     * end-of-turn threshold also decides {@link TurnDetectionEvent.TurnResult#turnComplete}.
+     *
+     * @param participantId a participant added with a
+     *                      {@link com.synauson.jsyn.spec.TurnDetectionConfig}
+     * @param update        the changes
+     * @return the config now in effect and the seq of its {@code TurnConfigUpdated}
+     * @throws com.synauson.jsyn.exception.NativeResourceClosedException if this conference is closed
+     * @throws com.synauson.jsyn.exception.InvalidArgumentException if an argument is null
+     *         or a value is out of range (the config is then unchanged)
+     * @throws com.synauson.jsyn.exception.FailedPreconditionException if the participant
+     *         has no turn detection
+     * @throws com.synauson.jsyn.exception.NotFoundException if there is no such participant
+     * @since 1.6.0
+     */
+    public AppliedTurnConfig updateTurnConfig(String participantId, TurnConfigUpdate update) {
+        requireOpen();
+        Args.notNull(participantId, "participantId");
+        Args.notNull(update, "update");
+        String json = NativeBridge.updateTurnConfig(runtimeHandle, conferenceId, participantId,
+            GSON.toJson(update));
+        return AppliedTurnConfig.fromJson(json);
     }
 
     /** Turns the engine's JSON strings into {@link AgentEvent}s for the caller's observer. */

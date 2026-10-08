@@ -276,16 +276,19 @@ An agent that talks with a participant needs one ordered stream of what that
 participant does. `conf.streamAgentEvents(id, options, observer)` delivers it as
 `AgentEvent`s for any participant with `TurnDetectionConfig` (and the `VadConfig` that
 drives it); without turn detection it throws `AgentStreamException` with reason
-`TURN_DETECTION_REQUIRED`. It is a preview: it carries speech activity now, and turn
-events (turn started, words, early and confirmed end of turn) come in later releases.
+`TURN_DETECTION_REQUIRED`. It is a preview: it carries speech activity and the turn
+lifecycle now, and words and early (eager) end of turn come in later releases.
 
 | Event | Fields | When |
 |---|---|---|
-| `Subscribed` | `oldestSeq`, `lastSeq`, `stt` | First on every subscription: the oldest event the stream keeps, its newest seq, whether STT runs |
+| `Subscribed` | `oldestSeq`, `lastSeq`, `stt`, `turnConfig` | First on every subscription: the oldest event the stream keeps, its newest seq, whether STT runs, the turn config in effect |
 | `Heartbeat` | `conferenceMs`, `sttDecodedMs`, `sttBacklogMs` | Whenever nothing else came for the heartbeat interval (default 1000 ms, `withHeartbeatMs`) |
 | `SpeechStarted` | `atMs`, `probability` | VAD heard speech start. Raw voice activity: noise can start it too. |
 | `SpeechStopped` | `atMs`, `speechMs` | VAD heard it stop; `speechMs` is how long it lasted |
-| `Error` | `reason`, `message`, `metadata`, `turnId` | A recoverable problem; the stream goes on |
+| `TurnStarted` | `turnId`, `startMs`, `wordBacked` | A turn started, on VAD's speech start when no turn was open |
+| `EndOfTurn` | `turnId`, `reason`, `text`, `startMs`, `speechEndMs`, `probability`, `complete`, latency fields | The turn ended (below) |
+| `TurnConfigUpdated` | `config` | `updateTurnConfig` changed the turn config |
+| `Error` | `reason`, `message`, `metadata`, `turnId` | A recoverable problem; the stream goes on. `TURN_DETECTION_FAILED`: turn detection stopped, so only the timeout or `forceEndTurn` end turns from then on. `TURN_DECISION_MISSING`: a speech end got no turn detection decision within 2 s; the timeout still ends the turn. `STT_STOPPED`: STT failed, so turns end without text from then on. |
 | `StreamEnded` | `reason` | Last: the participant was removed or the conference terminated. `onCompleted` follows. |
 | `Unknown` | `type`, `json` | A kind from a newer engine. Ignore it, but it still has a seq. |
 
@@ -295,6 +298,87 @@ time: the conference's pipeline clock in ms, the same for all its participants, 
 can compare one participant's speech with another's. `atMs` is where the speech really
 started or stopped, so it is earlier than the event by up to VAD's `minSpeechMs` or
 `minSilenceMs`.
+
+**Turns.** Turn ids rise by one from 1. Each `TurnStarted` is followed by exactly one
+`EndOfTurn` for it, and no event of a turn comes before the previous turn's
+`EndOfTurn`; `SpeechStarted` and `SpeechStopped` carry no turn and come at once. Speech
+after a pause stays in the open turn unless turn detection's decision on the pause says
+complete: then the turn ends at the pause and the new speech opens the next. A turn
+ends for one `reason`:
+
+- `MODEL`: turn detection's probability for a pause reached the end-of-turn threshold.
+- `TIMEOUT`: the participant stayed silent for the end-of-turn timeout (default 5000 ms,
+  0 turns it off) after a speech end, whatever turn detection said or whether it answered.
+- `MANUAL`: you called `conf.forceEndTurn(id)`.
+- `STREAM_ENDED`: the participant or conference went with the turn open.
+
+With STT, `EndOfTurn` waits for the turn's transcript: `text` is the same text as its
+`TranscriptEvent.Turn`, without the leading space, and `complete` is false when STT ran
+out of drain time first. Without STT, `text` is empty and `EndOfTurn` comes at once.
+`speechEndMs` is where the turn's speech ended (when it ended, if the participant was
+still speaking); the latency fields (`sinceSpeechEndMs`, `decisionMs`, `drainMs`,
+`sttBacklogMs`) are durations, null when not known.
+
+**Ending turns and the turn config.** `conf.forceEndTurn(id)` ends the open turn now
+and returns its id (empty when none was open); its `EndOfTurn` follows with reason
+`MANUAL`. With STT the engine forecasts the turn's last words, so the text usually
+comes within about 100 ms on an idle machine and never later than the STT drain
+budget. If the participant is still speaking, the next turn starts at once.
+`conf.updateTurnConfig(id, update)` changes the end-of-turn threshold or timeout
+mid-call (for more patience while a caller reads out a number, say) and returns the
+config in effect with the seq of the `TurnConfigUpdated` that announces it. Start a
+participant with a config other than the defaults with `TurnDetectionConfig.withTurns`.
+Thresholds are in [0, 1] and the timeout 0 to 60000 ms; anything else throws
+`InvalidArgumentException`, and eager end of turn can't be turned on yet. The threshold
+also decides `TurnDetectionEvent.TurnResult.turnComplete`, and timeouts and `forceEndTurn`
+also close a `TranscriptEvent.Turn`. Both calls throw `FailedPreconditionException`
+for a participant without turn detection.
+
+<!-- snippet: agent-turns -->
+```java
+import com.synauson.jsyn.event.AgentEvent;
+import com.synauson.jsyn.participant.Conference;
+import com.synauson.jsyn.spec.TurnDetectionConfig;
+import com.synauson.jsyn.spec.TurnConfigUpdate;
+import java.util.concurrent.BlockingQueue;
+
+/** Answers each of a caller's turns, from events an AgentStreamReader queued. */
+public class AgentTurns {
+    /** Turn detection for the caller, ending a turn after 3 s of silence at the latest. */
+    public static TurnDetectionConfig turnDetection() {
+        return TurnDetectionConfig.defaults()
+            .withTurns(TurnConfigUpdate.none().withEndOfTurnTimeoutMs(3_000));
+    }
+
+    public static void run(Conference conf, String callerId, BlockingQueue<AgentEvent> events)
+            throws InterruptedException {
+        while (true) {
+            AgentEvent event = events.take();
+            if (event instanceof AgentEvent.EndOfTurn) {
+                AgentEvent.EndOfTurn end = (AgentEvent.EndOfTurn) event;
+                // end.reason says why: MODEL, TIMEOUT, MANUAL or STREAM_ENDED.
+                answer(end.text);
+            } else if (event instanceof AgentEvent.StreamEnded) {
+                return;
+            }
+        }
+    }
+
+    /** The caller pressed a key that means "done": end the turn now. */
+    public static void doneKey(Conference conf, String callerId) {
+        conf.forceEndTurn(callerId); // its EndOfTurn (MANUAL) follows on the stream
+    }
+
+    /** Give the caller time to read out a long number. */
+    public static void morePatience(Conference conf, String callerId) {
+        conf.updateTurnConfig(callerId, TurnConfigUpdate.none().withEndOfTurnTimeoutMs(10_000));
+    }
+
+    private static void answer(String text) {
+        // Your LLM and TTS go here.
+    }
+}
+```
 
 **Order, seq and resume.** Every subscriber sees the events in one order. `seq` rises
 by one with each stored event, from 1; `Subscribed` and `Heartbeat` aren't stored
@@ -441,6 +525,7 @@ API.
 | Route audio between participants | [SipMixedSourcesE2eIT], [SipReserveConnectE2eIT] | `updatePartyAudioConnections`: growing the matrix mid-call, one destination mixing a native and a SIP source, and a two-way call as two one-way entries |
 | Voice activity detection | [VadDetectorIT], [RealVadE2eLatencyIT] | `VadConfig.defaults()`, a self-connection so audio reaches the detector, then `VadEvent.SpeechStart` |
 | End-of-turn detection | [TurnDetectionIT] | `TurnDetectionConfig` alongside VAD (without VAD it throws `InvalidArgumentException`), then `TurnDetectionEvent.TurnResult` |
+| Voice-agent turns | [AgentTurnsIT] | `TurnDetectionConfig.withTurns`, `forceEndTurn` ending the open turn with `MANUAL`, `updateTurnConfig` answered and announced, and the refusals |
 | Voice-agent event stream | [AgentStreamIT] | `streamAgentEvents`: `Subscribed` first, speech events in conference time, resuming from a cursor, `StreamEnded` on removal, and `TURN_DETECTION_REQUIRED` without turn detection |
 | Streaming speech-to-text | [SttIT] | `SttConfig` needs `TurnDetectionConfig`, `streamTranscriptEvents` needs STT on the participant, and `capabilities().stt`. Transcript content is tested on the engine side. |
 | Model store and missing models | [ModelStoreIT] | `JSyn.importModels` is idempotent and rejects corrupt files. A missing model throws `FailedPreconditionException` and leaves nothing half-built. |
@@ -469,6 +554,7 @@ their javadoc. `capabilities()` is covered by the licensing tour.
 [TurnDetectionIT]: jsyn/src/test/java/com/synauson/jsyn/it/TurnDetectionIT.java
 [SttIT]: jsyn/src/test/java/com/synauson/jsyn/it/SttIT.java
 [AgentStreamIT]: jsyn/src/test/java/com/synauson/jsyn/it/AgentStreamIT.java
+[AgentTurnsIT]: jsyn/src/test/java/com/synauson/jsyn/it/AgentTurnsIT.java
 [ModelStoreIT]: jsyn/src/test/java/com/synauson/jsyn/it/ModelStoreIT.java
 [SipParticipantIT]: jsyn/src/test/java/com/synauson/jsyn/it/SipParticipantIT.java
 [SipMediaE2eIT]: jsyn/src/test/java/com/synauson/jsyn/it/SipMediaE2eIT.java

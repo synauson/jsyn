@@ -338,6 +338,30 @@ public final class NativeBridge {
                                                     EventStreamObserver<?> listener);
 
     /**
+     * End a participant's open voice-agent turn now.
+     *
+     * @param handle runtime handle
+     * @param confId conference identifier
+     * @param pid    participant identifier
+     * @return JSON {@code {"ended":bool,"turnId":n}}, {@code turnId} absent when nothing ended
+     * @since 1.6.0
+     */
+    public static native String forceEndTurn(long handle, String confId, String pid);
+
+    /**
+     * Change a participant's voice-agent turn config.
+     *
+     * @param handle     runtime handle
+     * @param confId     conference identifier
+     * @param pid        participant identifier
+     * @param updateJson a {@code TurnConfigUpdate} as JSON (snake_case keys)
+     * @return JSON {@code {"config":{...},"seq":n}}
+     * @since 1.6.0
+     */
+    public static native String updateTurnConfig(long handle, String confId, String pid,
+                                                 String updateJson);
+
+    /**
      * Subscribe to file playback events for a participant.
      *
      * @param handle   runtime handle

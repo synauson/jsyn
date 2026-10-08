@@ -1,8 +1,15 @@
 package com.synauson.jsyn.event;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.synauson.jsyn.AgentStreamOptions;
+import com.synauson.jsyn.AppliedTurnConfig;
+import com.synauson.jsyn.TurnConfig;
 import com.synauson.jsyn.exception.AgentStreamException;
 import com.synauson.jsyn.exception.InvalidArgumentException;
+import com.synauson.jsyn.spec.TurnDetectionConfig;
+import com.synauson.jsyn.spec.TurnConfigUpdate;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -36,11 +43,16 @@ class AgentEventJsonTest {
     @Test
     void readsEveryKind() {
         AgentEvent.Subscribed sub = assertInstanceOf(AgentEvent.Subscribed.class,
-            parse(0, "\"type\":\"subscribed\",\"oldestSeq\":1,\"lastSeq\":4,\"stt\":true"));
+            parse(0, "\"type\":\"subscribed\",\"oldestSeq\":1,\"lastSeq\":4,\"stt\":true,"
+                + "\"turnConfig\":" + CONFIG));
         assertEquals(1, sub.oldestSeq);
         assertEquals(4, sub.lastSeq);
         assertTrue(sub.stt);
         assertFalse(sub.isStored());
+        assertConfig(sub.turnConfig);
+        AgentEvent.Subscribed older = assertInstanceOf(AgentEvent.Subscribed.class,
+            parse(0, "\"type\":\"subscribed\",\"oldestSeq\":0,\"lastSeq\":0,\"stt\":false"));
+        assertNull(older.turnConfig, "an engine before turn events");
 
         AgentEvent.Heartbeat beat = assertInstanceOf(AgentEvent.Heartbeat.class,
             parse(4, "\"type\":\"heartbeat\",\"conferenceMs\":12000,"
@@ -74,13 +86,85 @@ class AgentEventJsonTest {
             parse(2, "\"type\":\"speechStopped\",\"atMs\":2500,\"speechMs\":1500"));
         assertEquals(2500, stop.atMs);
         assertEquals(1500, stop.speechMs);
+
+        AgentEvent.TurnStarted turn = assertInstanceOf(AgentEvent.TurnStarted.class,
+            parse(3, "\"type\":\"turnStarted\",\"turnId\":1,\"startMs\":1000,\"wordBacked\":false"));
+        assertEquals(1, turn.turnId);
+        assertEquals(1000, turn.startMs);
+        assertFalse(turn.wordBacked);
+
+        AgentEvent.EndOfTurn end2 = assertInstanceOf(AgentEvent.EndOfTurn.class,
+            parse(4, "\"type\":\"endOfTurn\",\"turnId\":1,\"reason\":\"MODEL\","
+                + "\"text\":\"hello there\",\"startMs\":1000,\"speechEndMs\":2500,"
+                + "\"probability\":0.75,\"complete\":true,\"latency\":{\"sinceSpeechEndMs\":400,"
+                + "\"decisionMs\":30,\"drainMs\":250,\"sttBacklogMs\":80}"));
+        assertEquals(1, end2.turnId);
+        assertEquals(AgentEvent.EndOfTurn.MODEL, end2.reason);
+        assertEquals("hello there", end2.text);
+        assertEquals(1000, end2.startMs);
+        assertEquals(2500, end2.speechEndMs);
+        assertEquals(0.75f, end2.probability, 1e-6);
+        assertTrue(end2.complete);
+        assertEquals(Long.valueOf(400), end2.sinceSpeechEndMs);
+        assertEquals(Long.valueOf(30), end2.decisionMs);
+        assertEquals(Long.valueOf(250), end2.drainMs);
+        assertEquals(Long.valueOf(80), end2.sttBacklogMs);
+        AgentEvent.EndOfTurn bare = assertInstanceOf(AgentEvent.EndOfTurn.class,
+            parse(4, "\"type\":\"endOfTurn\",\"turnId\":2,\"reason\":\"TIMEOUT\",\"text\":\"\","
+                + "\"startMs\":3000,\"speechEndMs\":3500,\"complete\":true,\"latency\":{}"));
+        assertEquals(AgentEvent.EndOfTurn.TIMEOUT, bare.reason);
+        assertNull(bare.probability, "absent when turn detection didn't decide");
+        assertNull(bare.decisionMs);
+        assertNull(bare.drainMs);
+
+        AgentEvent.TurnConfigUpdated updated = assertInstanceOf(AgentEvent.TurnConfigUpdated.class,
+            parse(5, "\"type\":\"turnConfigUpdated\",\"config\":" + CONFIG));
+        assertConfig(updated.config);
+    }
+
+    /** A turn config as the engine sends it. */
+    private static final String CONFIG = "{\"endOfTurnThreshold\":0.5,\"eager\":false,"
+        + "\"eagerThreshold\":0.0,\"endOfTurnTimeoutMs\":5000}";
+
+    private static void assertConfig(TurnConfig c) {
+        assertNotNull(c);
+        assertEquals(0.5f, c.endOfTurnThreshold, 1e-6);
+        assertFalse(c.eager);
+        assertEquals(0f, c.eagerThreshold, 1e-6);
+        assertEquals(5000, c.endOfTurnTimeoutMs);
+    }
+
+    @Test
+    void turnCommandsReadAndWriteTheEnginesJson() {
+        AppliedTurnConfig applied = AppliedTurnConfig.fromJson("{\"config\":" + CONFIG + ",\"seq\":9}");
+        assertConfig(applied.config);
+        assertEquals(9, applied.seq);
+
+        // Updates use the detector config's snake_case keys and leave out unset fields.
+        Gson gson = new Gson();
+        assertEquals("{}", gson.toJson(TurnConfigUpdate.none()));
+        JsonObject update = JsonParser.parseString(gson.toJson(TurnConfigUpdate.none()
+            .withEndOfTurnThreshold(0.7f).withEager(false).withEagerThreshold(0.2f)
+            .withEndOfTurnTimeoutMs(8000))).getAsJsonObject();
+        assertEquals(0.7f, update.get("end_of_turn_threshold").getAsFloat(), 1e-6);
+        assertFalse(update.get("eager").getAsBoolean());
+        assertEquals(0.2f, update.get("eager_threshold").getAsFloat(), 1e-6);
+        assertEquals(8000, update.get("end_of_turn_timeout_ms").getAsInt());
+
+        JsonObject plain = JsonParser.parseString(gson.toJson(new TurnDetectionConfig(16000, 0.5f)))
+            .getAsJsonObject();
+        assertFalse(plain.has("turns"), "no turns key unless set");
+        JsonObject withTurns = JsonParser.parseString(gson.toJson(new TurnDetectionConfig(16000, 0.5f)
+            .withTurns(TurnConfigUpdate.none().withEndOfTurnTimeoutMs(0)))).getAsJsonObject();
+        assertEquals(0, withTurns.getAsJsonObject("turns").get("end_of_turn_timeout_ms").getAsInt());
+        assertEquals(16000, withTurns.get("buffered_samples").getAsInt());
     }
 
     @Test
     void aKindFromANewerEngineIsUnknownNotAnError() {
-        String json = "{" + ENVELOPE + "\"seq\":7,\"type\":\"turnStarted\",\"turnId\":1}";
+        String json = "{" + ENVELOPE + "\"seq\":7,\"type\":\"turnWords\",\"turnId\":1}";
         AgentEvent.Unknown u = assertInstanceOf(AgentEvent.Unknown.class, AgentEvent.fromJson(json));
-        assertEquals("turnStarted", u.type);
+        assertEquals("turnWords", u.type);
         assertEquals(json, u.json);
         assertEquals(7, u.seq, "the envelope is still read");
         assertEquals("p", u.participantId);

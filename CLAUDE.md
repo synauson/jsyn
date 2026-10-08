@@ -84,7 +84,9 @@ tests the newest natives and the docs recommend them.
   reaches the observer as a JSON string that `AgentEvent.fromJson` reads, and an unknown
   `type` becomes `AgentEvent.Unknown`. A test beside the engine's agent events pins the
   keys; `AgentEventJsonTest` mirrors them, so change both together. Its errors are `exception/AgentStreamException(String, String, long)`, looked up
-  when the stream is subscribed.
+  when the stream is subscribed. `forceEndTurn` and `updateTurnConfig` return JSON too
+  (`Conference` and `AppliedTurnConfig` read it); `TurnConfigUpdate` goes out with
+  snake_case keys, like the detector specs it also sits in (`TurnDetectionConfig.turns`).
 - `JSynConfig` fields serialize camelCase and must match the Rust `ConfigJson`. Spec
   classes serialize snake_case through `@SerializedName`. Gson omits null fields, so an
   unset option reaches the engine as absent and takes the engine default. Keep it that
