@@ -25,49 +25,57 @@ signalling events.
 | | |
 |---|---|
 | Java | 11 or newer |
-| Platforms | Linux x86_64 (glibc 2.34 or newer), Windows x86_64. macOS and ARM are not supported. |
-| GStreamer | 1.26 is recommended and 1.24 is the minimum. **1.28 is not supported**: it changed the `webrtcbin` pad API, which breaks WebRTC. |
+| Platforms | Linux x86_64 (glibc 2.34 or newer), Windows 10 or 11 x86_64. macOS and ARM are not supported. |
+| GStreamer | 1.26 is recommended and 1.24 is the minimum. **1.28 is not supported**: it changed the `webrtcbin` pad API, which breaks WebRTC. On Linux this decides the distribution: Ubuntu 24.04 and Debian 13 work; Ubuntu 26.04 and Fedora 44 (1.28), Debian 12 and Ubuntu 22.04 (too old) don't. |
+| Visual C++ runtime | Windows only: the latest Microsoft Visual C++ v14 Redistributable, x64 ([`vc_redist.x64.exe`](https://aka.ms/vc14/vc_redist.x64.exe)). The natives link against it, and a clean Windows install lacks it. |
 | ONNX Runtime | Nothing to install. 1.24.4 ships inside the `jsyn-natives-*` jar. |
+| GPU | Not used: inference runs on the CPU, and no NVIDIA software is needed. GPU support is planned. |
 | License key | Required. Free-tier keys work. Get one at [synauson.com](https://synauson.com). |
 | Network | At startup the engine exchanges the key at `license.synauson.com` and downloads the models your license includes from `dl.synauson.com`. See [offline hosts](#licensing-and-models) if the host has no internet access. |
 
+[`docs/install.md`](docs/install.md) has the full steps, the supported Linux
+distributions, firewall rules, hardware sizing for speech-to-text, and installation
+troubleshooting. In short:
+
 ### Linux
 
-On Debian or Ubuntu, install the GStreamer runtime:
+On Ubuntu 24.04 or Debian 13, install the GStreamer runtime:
 
 ```bash
 sudo apt-get install -y libgstreamer1.0-0 gstreamer1.0-plugins-base \
-    gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-nice
+    gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-nice \
+    gstreamer1.0-tools
 ```
 
-`gstreamer1.0-nice` provides ICE for WebRTC and is easy to miss. CI also installs
-`gstreamer1.0-plugins-ugly` and `gstreamer1.0-libav`. On other distributions, install the
-equivalent packages; the ICE plugin often ships as its own package. To check the install:
+`gstreamer1.0-nice` provides ICE for WebRTC and is easy to miss. `gstreamer1.0-tools`
+provides `gst-inspect-1.0` for this check:
 
 ```bash
 gst-inspect-1.0 --version
 gst-inspect-1.0 --exists errorignore && gst-inspect-1.0 --exists webrtcbin \
-    && gst-inspect-1.0 --exists nicesrc && echo ok
+    && gst-inspect-1.0 --exists nicesrc && gst-inspect-1.0 --exists dtmfdetect && echo ok
 ```
 
 ### Windows
 
-1. Install the GStreamer 1.26.7 MSVC runtime installer,
+1. Install the Visual C++ runtime,
+   [`vc_redist.x64.exe`](https://aka.ms/vc14/vc_redist.x64.exe).
+2. Install the GStreamer 1.26.7 MSVC runtime installer,
    [`gstreamer-1.0-msvc-x86_64-1.26.7.msi`](https://gstreamer.freedesktop.org/data/pkg/windows/1.26.7/msvc/gstreamer-1.0-msvc-x86_64-1.26.7.msi),
    system-wide with the Complete profile, to `C:\gstreamer\1.0\msvc_x86_64`. You do not
    need the devel installer.
-2. In an elevated PowerShell, set `GSTREAMER_1_0_ROOT_MSVC_X86_64` and add `bin` to the
+3. In an elevated PowerShell, set `GSTREAMER_1_0_ROOT_MSVC_X86_64` and add `bin` to the
    machine `Path`:
    ```powershell
    [Environment]::SetEnvironmentVariable("GSTREAMER_1_0_ROOT_MSVC_X86_64", "C:\gstreamer\1.0\msvc_x86_64", "Machine")
    $p = [Environment]::GetEnvironmentVariable("Path", "Machine")
    [Environment]::SetEnvironmentVariable("Path", "$p;C:\gstreamer\1.0\msvc_x86_64\bin", "Machine")
    ```
-3. Sign out and back in. Then, once per Windows user, build GStreamer's plugin registry
+4. Sign out and back in. Then, once per Windows user, build GStreamer's plugin registry
    with `gst-inspect-1.0.exe coreelements`. If you skip this, the first `new JSyn(...)`
    performs the scan, which took 7 to 44 seconds on fresh CI machines.
 
-For a step-by-step walkthrough, see the
+For a complete Gradle project, see the
 [Windows quickstart](https://github.com/synauson/examples/tree/main/java/jsyn-windows-quickstart).
 
 ## Install
@@ -238,7 +246,8 @@ decoding pool loads in the background when the runtime starts; until
 `capabilities().stt.state` is `ready`, adding a participant with STT throws
 `FailedPreconditionException`. `capabilities().stt` also reports how many STT streams
 the machine transcribes in real time, as measured; `JSynConfig.Builder.sttCapacity`
-overrides it.
+overrides it. [Sizing for STT](docs/install.md#sizing-for-stt) gives measured figures
+per CPU.
 
 Everything that owns native memory is `AutoCloseable`: `JSyn`, `Conference`, `Subscription` and
 `NativeParticipant`. Close them in reverse order of creation, which
@@ -375,8 +384,10 @@ the state directory on volumes so that models and the license survive restarts.
 |---|---|
 | `UnsatisfiedLinkError: missing native: com/synauson/jsyn/natives/<platform>/… — add jsyn-natives-<platform> to your classpath` | The natives jar for this OS is not on the runtime classpath. Add `jsyn-natives-linux` or `jsyn-natives-windows`. |
 | `UnsatisfiedLinkError: jsyn does not yet support OS '…'` (or `arch`) | Only Linux and Windows on x86_64 are supported. |
+| `UnsatisfiedLinkError: …onnxruntime.dll: Can't find dependent libraries` (or the same for `synauson_jni.dll`) on Windows | The Visual C++ runtime is missing: install [`vc_redist.x64.exe`](https://aka.ms/vc14/vc_redist.x64.exe). For `synauson_jni.dll`, GStreamer's `bin` folder may also be missing from `Path`. See [installation troubleshooting](docs/install.md#troubleshooting). |
 | `UnsatisfiedLinkError` naming a `libgst…` library, or `gstreamer-1.0-0.dll` on Windows | GStreamer is not installed or not on the library path. See [Requirements](#requirements). On Windows, sign out and back in after changing `Path`. |
 | `InternalException: GStreamer sanity check failed: required GStreamer element '…' not found` | A plugin set is missing. `errorignore` comes from `gstreamer1.0-plugins-bad`, and the mixer and codecs from `-base` and `-good`. |
+| Adding a SIP participant throws `InternalException` naming `dtmfdetect` | GStreamer lacks its spandsp plugin, as on RHEL. Use a [supported distribution](docs/install.md#supported-distributions). |
 | WebRTC participants fail while SIP and file participants work | The ICE plugin is missing (`gstreamer1.0-nice`), or GStreamer is 1.28. |
 | `InvalidArgumentException: no license key configured: set SYNAUSON_LICENSE_KEY …` | Set the variable, or pass `licenseKey(...)`. |
 | `PermissionDeniedException: license.synauson.com refused this license key: …` | The key is wrong, expired or revoked. |

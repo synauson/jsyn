@@ -3,7 +3,10 @@
 jsyn is the public Java SDK for the Synauson engine. It calls into `synauson-jni` over JNI.
 The engine lives in the private repository https://github.com/synauson/synauson; complete
 example applications live in https://github.com/synauson/examples. `README.md` is the user
-documentation. Read it rather than repeating it here.
+documentation, and `docs/install.md` its installation guide (distributions, Windows
+setup, firewall, STT sizing). Read them rather than repeating them here. When CI's
+GStreamer version or packages change, update both: they name the Windows GStreamer
+release and the apt packages CI installs.
 
 ## Commands
 
