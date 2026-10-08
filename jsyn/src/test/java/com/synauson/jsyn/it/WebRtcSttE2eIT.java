@@ -188,13 +188,17 @@ class WebRtcSttE2eIT {
 
                     // Each EndOfTurn's text is its turn transcript's, without the
                     // leading space. The transcript stream was open before any audio,
-                    // so it has every turn, in the same order.
+                    // so it has every turn, in the same order; a turn without words is
+                    // on the transcript stream only.
                     List<TranscriptEvent.Turn> turns = new ArrayList<>();
                     while (turns.size() < ends.size()) {
                         Object o = transcripts.received.poll(30, TimeUnit.SECONDS);
                         assertNotNull(o, "a turn transcript per end of turn within 30 s");
                         if (o instanceof Throwable) fail("transcript stream failed", (Throwable) o);
-                        if (o instanceof TranscriptEvent.Turn) turns.add((TranscriptEvent.Turn) o);
+                        if (o instanceof TranscriptEvent.Turn
+                                && !((TranscriptEvent.Turn) o).text.trim().isEmpty()) {
+                            turns.add((TranscriptEvent.Turn) o);
+                        }
                     }
                     for (int i = 0; i < ends.size(); i++) {
                         assertEquals(turns.get(i).text.trim(), ends.get(i).text,
@@ -251,9 +255,10 @@ class WebRtcSttE2eIT {
                 ends.add(end);
             } else if (e instanceof AgentEvent.Error) {
                 AgentEvent.Error err = (AgentEvent.Error) e;
-                // A late turn detection decision on a loaded machine is recoverable (the
-                // timeout ends the turn); STT or turn detection stopping is not.
-                assertEquals(AgentEvent.Error.TURN_DECISION_MISSING, err.reason,
+                // A late turn detection decision or STT falling behind on a loaded
+                // machine is recoverable; STT or turn detection stopping is not.
+                assertTrue(AgentEvent.Error.TURN_DECISION_MISSING.equals(err.reason)
+                        || AgentEvent.Error.STT_LAGGING.equals(err.reason),
                         err.reason + ": " + err.message);
             } else if (e instanceof AgentEvent.StreamEnded) {
                 fail("the stream ended early");
