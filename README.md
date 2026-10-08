@@ -226,11 +226,13 @@ Streaming speech-to-text works the same way: add `SttConfig` next to `TurnDetect
 `conf.streamTranscriptEvents(id, observer)`. `TranscriptEvent.Delta` carries committed
 text as it is decoded, never revised. `TranscriptEvent.Turn` carries one turn's text
 when turn detection completes the turn; the turns' texts add up to the deltas' text, each
-word once. If transcription runs behind by more than `SttConfig.turnDrainMs` (default
+word once. If the turn's text hasn't settled within `SttConfig.turnDrainMs` (default
 1000 ms), the turn arrives with `complete == false` and its late words open the next
-turn. STT needs `FEATURE_STT` in the license and an STT model, which the engine doesn't
-ship yet. `capabilities().stt` reports how many STT streams the machine transcribes in
-real time, measured at startup; `JSynConfig.Builder.sttCapacity` overrides it.
+turn. STT needs `FEATURE_STT` in the license. Its decoding pool loads in the background
+when the runtime starts; until `capabilities().stt.state` is `ready`, adding a
+participant with STT throws `FailedPreconditionException`. `capabilities().stt` also
+reports how many STT streams the machine transcribes in real time, as measured;
+`JSynConfig.Builder.sttCapacity` overrides it.
 
 Everything that owns native memory is `AutoCloseable`: `JSyn`, `Conference`, `Subscription` and
 `NativeParticipant`. Close them in reverse order of creation, which
@@ -287,7 +289,7 @@ API.
 | Route audio between participants | [SipMixedSourcesE2eIT], [SipReserveConnectE2eIT] | `updatePartyAudioConnections`: growing the matrix mid-call, one destination mixing a native and a SIP source, and a two-way call as two one-way entries |
 | Voice activity detection | [VadDetectorIT], [RealVadE2eLatencyIT] | `VadConfig.defaults()`, a self-connection so audio reaches the detector, then `VadEvent.SpeechStart` |
 | End-of-turn detection | [TurnDetectionIT] | `TurnDetectionConfig` alongside VAD, then `TurnDetectionEvent.TurnResult` |
-| Streaming speech-to-text | [SttIT] | `SttConfig` needs `TurnDetectionConfig`, `streamTranscriptEvents` needs STT on the participant, and `capabilities().stt`. Transcripts themselves need an STT model the engine doesn't ship yet. |
+| Streaming speech-to-text | [SttIT] | `SttConfig` needs `TurnDetectionConfig`, `streamTranscriptEvents` needs STT on the participant, and `capabilities().stt`. Transcript content is tested on the engine side. |
 | Model store and missing models | [ModelStoreIT] | `JSyn.importModels` is idempotent and rejects corrupt files. A missing model throws `FailedPreconditionException` and leaves nothing half-built. |
 | Inbound SIP call | [SipParticipantIT], [SipMediaE2eIT] | `addSipParticipant`, `localRtpPort()` for your SDP, real RTP both ways, VAD on a SIP caller |
 | Outbound SIP call (reserve, then connect) | [SipReserveConnectE2eIT] | Reserve the ports for the offer, connect with the answer's `SipRemoteMedia`, SRTP keys across the two phases, and releasing a reservation |

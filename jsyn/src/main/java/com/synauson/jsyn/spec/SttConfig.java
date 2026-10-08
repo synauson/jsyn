@@ -19,10 +19,10 @@ import org.jspecify.annotations.Nullable;
  */
 public final class SttConfig {
     /**
-     * How long a turn's transcript waits, after turn detection's decision, for the
-     * transcription to reach the turn's end: 0 to 10000 ms of wall time. {@code null}
-     * uses the engine's default (1000 ms). A turn that runs out of time is sent with
-     * {@code complete == false}, and its late words open the next turn.
+     * How long a turn's transcript waits, after turn detection's decision, for its text to
+     * settle: 0 to 10000 ms of wall time. {@code null} uses the engine's default
+     * (1000 ms). A turn that runs out of time is sent with {@code complete == false},
+     * and its late words open the next turn.
      */
     @SerializedName("turn_drain_ms")
     public final @Nullable Integer turnDrainMs;

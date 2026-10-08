@@ -19,12 +19,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
- * Streaming STT: what the engine refuses, and the STT capacity it reports.
- *
- * <p>Transcribing needs an STT model the engine's catalog doesn't ship yet, so these
- * tests stop short of transcripts: they check that STT is refused without turn detection,
- * that a participant without STT has no transcript stream, and that
- * {@code capabilities().stt} is reported.
+ * Streaming STT: what the engine refuses, and the STT capacity it reports. Transcript
+ * content is tested on the engine side.
  */
 @Timeout(value = 60, unit = TimeUnit.SECONDS)
 class SttIT {

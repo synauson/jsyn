@@ -166,36 +166,47 @@ public final class Capabilities {
     }
 
     /**
-     * How many STT streams this machine transcribes in real time, and the pool that
-     * does it: calibrated when the runtime starts from a timed decode, or set with
-     * {@link JSynConfig.Builder#sttCapacity}. The license's {@code FEATURE_STT} stream
-     * limit applies on top.
+     * STT's decoding pool, and how many STT streams this machine transcribes in real
+     * time: measured when the pool starts (a timed decode, and the memory one worker's
+     * model copy takes), or set with {@link JSynConfig.Builder#sttCapacity}. The
+     * license's {@code FEATURE_STT} stream limit applies on top.
      *
      * @since 1.6.0
      */
     public static final class SttCapacity {
         /**
-         * {@code "calibrated"}, {@code "configured"}, {@code "calibrating"},
-         * {@code "failed"}, or {@code "not-calibrated"} (no licensed STT model yet; the
-         * first STT participant calibrates).
+         * {@code "ready"}; {@code "loading"} (the pool loads in the background, and
+         * adding a participant with STT throws {@code FailedPreconditionException}
+         * until it is ready); {@code "idle"} (not started: no license or model yet,
+         * {@link #detail} says which); or {@code "failed"} (the next STT participant
+         * tries again).
          */
         public final String state;
+        /** Whether the numbers were measured ({@code true}) or set by the operator. */
+        public final @Nullable Boolean calibrated;
         /** Decoding workers, once known. */
         public final @Nullable Integer workers;
         /** ONNX Runtime threads per worker, once known. */
         public final @Nullable Integer threadsPerWorker;
         /** One stream's decode time over audio time, when measured. */
         public final @Nullable Double realTimeFactor;
+        /** Resident memory of one worker's model copy, when measured (Linux). */
+        public final @Nullable Long modelBytes;
+        /** What set the worker count: {@code "cpu"}, {@code "memory"} or {@code "operator"}. */
+        public final @Nullable String limitedBy;
         /** The stream cap (once known) and the STT streams in use. */
         public final Usage streams;
-        /** Why it is not calibrated, or failed. */
+        /** Why it is idle, or failed. */
         public final @Nullable String detail;
 
         private SttCapacity() {
             this.state = null;
+            this.calibrated = null;
             this.workers = null;
             this.threadsPerWorker = null;
             this.realTimeFactor = null;
+            this.modelBytes = null;
+            this.limitedBy = null;
             this.streams = null;
             this.detail = null;
         }

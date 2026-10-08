@@ -88,12 +88,14 @@ public abstract class TranscriptEvent {
     /**
      * One turn's text, sent after the deltas it covers.
      *
-     * <p>When turn detection reports a complete turn, the engine waits up to
-     * {@link com.synauson.jsyn.spec.SttConfig#turnDrainMs} for the transcription to
-     * reach the turn's end, then sends the committed text up to it that no earlier turn
-     * holds. The turns' texts concatenate to the deltas' texts: each piece is in exactly
-     * one turn, in order. A turn that runs out of time has {@link #complete} false, and
-     * its late words open the next turn.
+     * <p>The model commits a word some time after it is spoken, so the engine cuts a
+     * turn where the speech is: its text is the committed text up to where the next
+     * speech started, never split inside a word. When turn detection reports a complete
+     * turn, the engine waits up to {@link com.synauson.jsyn.spec.SttConfig#turnDrainMs}
+     * for that text to settle. The turns' texts concatenate to the deltas' texts: each
+     * piece is in exactly one turn, in order. A turn that runs out of time has
+     * {@link #complete} false, and its late words open the next turn. Punctuation that
+     * ends a sentence comes with the next word, so it opens the next turn's text.
      *
      * <p>JNI constructor:
      * {@code (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JJJFZ)V}.
