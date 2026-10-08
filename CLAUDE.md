@@ -143,3 +143,7 @@ credentials.
   period. No body, no trailers, no AI attribution.
 - Pull requests are disabled. The bot commits to a branch, CI runs on every branch push,
   and `main` only fast-forwards to a commit whose required checks passed.
+- Every CI job runs on a GitHub-hosted runner (`ubuntu-24.04`, `windows-2025`), never a
+  self-hosted one: a public repository's workflows must not reach private machines. Jobs
+  start cold, so they install their dependencies and restore models, the GStreamer
+  installer, Chromium and Gradle from the Actions cache.
