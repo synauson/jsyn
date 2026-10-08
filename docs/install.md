@@ -176,7 +176,7 @@ Nothing printed after the version means every element is present. Then run the
 | Direction | Endpoint | Why |
 |---|---|---|
 | Outbound HTTPS | `license.synauson.com` | Exchanges the license key for a signed license at startup, and renews it about once a day |
-| Outbound HTTPS | `*.r2.cloudflarestorage.com` (Cloudflare R2) | Downloads the models the license includes, once per model version: about 11 MB for `detect`; a `speech` license adds the STT model (about 660 MB) and the lettura-1 TTS model with its voices and pronunciation data (about 347 MB) |
+| Outbound HTTPS | `*.r2.cloudflarestorage.com` (Cloudflare R2) | Downloads the models the license includes, once per model version: about 11 MB for `detect`; a `speech` license adds the STT model (about 660 MB) and the TTS model with its voices and pronunciation data (about 347 MB) |
 | Outbound HTTPS | `maven.synauson.com` | The jsyn jars, at build time only |
 | Outbound UDP 19302 | `stun.l.google.com` | The default STUN server for WebRTC; change it with `JSynConfig.Builder.webrtcStunServer` |
 | Inbound and outbound UDP | The SIP RTP range | `rtpPortMin` to `rtpPortMax` (default 10000 to 20000) |
@@ -211,7 +211,7 @@ New-NetFirewallRule -DisplayName 'jsyn WebRTC ICE (TCP)' -Direction Inbound -Act
 ## Sizing for STT
 
 Streaming speech-to-text is by far the heaviest thing the engine runs. The figures
-below are Synauson's own measurements with the spartito-1 int8 model; treat them as a
+below are Synauson's own measurements with the int8 STT model; treat them as a
 guide, not a guarantee, and check the numbers your own machine reports.
 
 - On current Intel server CPUs, STT ran about one real-time stream per vCPU. Older
@@ -238,7 +238,7 @@ itself from the runtime's CPU budget, a container's or service's CPU quota and c
 rather than the host's CPU count (`capabilities().resources`); `cpuBudget` and
 `memoryBudget` set it by hand.
 
-The engine also times one VAD chunk and one turn detection decision in the background at
+The engine also times one VAD chunk and one turn-detection decision in the background at
 startup. It keeps every timing in `calibration.json` in the state directory
 (`JSynConfig.Builder.stateDir`), and a later start reuses a timing instead of measuring
 again when the model, the CPU and its features, the CPU budget, the thread count and the

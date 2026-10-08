@@ -36,7 +36,7 @@ public abstract class VadEvent {
      * @since 0.1.0
      */
     public static final class SpeechStart extends VadEvent {
-        /** sentito-1 confidence score in {@code [0.0, 1.0]} at the moment of detection. */
+        /** VAD confidence score in {@code [0.0, 1.0]} at the moment of detection. */
         public final float confidence;
 
         /**
@@ -44,7 +44,7 @@ public abstract class VadEvent {
          *
          * @param conferenceId  conference identifier
          * @param participantId participant identifier
-         * @param confidence    sentito-1 confidence score in {@code [0.0, 1.0]}
+         * @param confidence    VAD confidence score in {@code [0.0, 1.0]}
          */
         public SpeechStart(String conferenceId, String participantId, float confidence) {
             super(conferenceId, participantId);

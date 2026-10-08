@@ -4,12 +4,12 @@ import com.google.gson.annotations.SerializedName;
 import org.jspecify.annotations.Nullable;
 
 /**
- * TurnDetection detector configuration.
+ * Turn-detection configuration.
  *
  * <p>Serializes to the JSON shape expected by the Rust {@code TurnDetectionConfigInternal}:
  * snake_case field names ({@code buffered_samples}, {@code confidence_threshold}).
  *
- * <p>The underlying detector is the turn detection ONNX model; see {@link #defaults()} for
+ * <p>The underlying detector is the turn-detection ONNX model; see {@link #defaults()} for
  * production-recommended values. It decides when VAD reports a speech end, so it needs a
  * {@link VadConfig} on the same participant; without one, adding the participant throws
  * {@link com.synauson.jsyn.exception.InvalidArgumentException}. Turn detection also gives the
@@ -37,7 +37,7 @@ public final class TurnDetectionConfig {
     public final @Nullable TurnConfigUpdate turns;
 
     /**
-     * Construct a TurnDetection configuration with the given parameters.
+     * Construct a turn-detection configuration with the given parameters.
      *
      * @param bufferedSamples     samples to buffer before inference; must be positive
      * @param confidenceThreshold threshold in {@code [0.0, 1.0]} for turn-complete classification
@@ -67,11 +67,11 @@ public final class TurnDetectionConfig {
     }
 
     /**
-     * Returns a TurnDetection config with sensible defaults matching the model's
+     * Returns a turn-detection config with sensible defaults matching the model's
      * recommended parameters ({@code bufferedSamples=160},
      * {@code confidenceThreshold=0.5}).
      *
-     * @return default TurnDetection configuration
+     * @return default turn-detection configuration
      */
     public static TurnDetectionConfig defaults() {
         return new TurnDetectionConfig(160, 0.5f);

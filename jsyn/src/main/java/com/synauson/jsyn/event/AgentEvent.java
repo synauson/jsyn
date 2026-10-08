@@ -231,7 +231,7 @@ public abstract class AgentEvent {
          */
         public static final String TURN_DETECTION_FAILED = "TURN_DETECTION_FAILED";
         /**
-         * A speech end got no turn detection decision within 2 s; the end-of-turn timeout
+         * A speech end got no turn-detection decision within 2 s; the end-of-turn timeout
          * still ends the turn.
          */
         public static final String TURN_DECISION_MISSING = "TURN_DECISION_MISSING";

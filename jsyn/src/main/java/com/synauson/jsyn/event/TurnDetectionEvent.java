@@ -1,9 +1,9 @@
 package com.synauson.jsyn.event;
 
 /**
- * Turn detection Detection event.
+ * Turn-detection event.
  *
- * <p>Emitted on the turn detection event stream returned by
+ * <p>Emitted on the turn-detection event stream returned by
  * {@link com.synauson.jsyn.participant.Conference#streamTurnDetectionEvents}.
  * Closed hierarchy: only {@link TurnResult} is a valid subtype. The
  * package-private constructor prevents external subclassing.

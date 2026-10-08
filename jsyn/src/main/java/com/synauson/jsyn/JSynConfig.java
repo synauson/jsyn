@@ -380,7 +380,7 @@ public final class JSynConfig {
         }
 
         /**
-         * Set the model store the VAD and turn detection detectors load their models from.
+         * Set the model store the VAD and turn-detection detectors load their models from.
          * Optional; see {@link JSynConfig#modelStore} for the default. Fill a store with
          * {@link JSyn#importModels}. A model missing from the store makes only the
          * features that need it fail, with a

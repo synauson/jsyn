@@ -131,7 +131,7 @@ final class JSynTestHelpers {
      * Wait until {@code capabilities().tts.state} is {@code "ready"}: adding a participant
      * with a speaker before then throws, and closing a runtime while the engine loads can
      * crash ONNX Runtime. Fails if it fails, or isn't ready in time ({@code idle} says
-     * why: no license yet, or no lettura in the store).
+     * why: no license yet, or no TTS model in the store).
      */
     static void awaitTtsReady(JSyn syn, java.time.Duration within) throws InterruptedException {
         long deadline = System.nanoTime() + within.toNanos();
@@ -182,7 +182,7 @@ final class JSynTestHelpers {
     }
 
     /**
-     * Return a path to a short WAV file suitable for VAD/TurnDetection tests.
+     * Return a path to a short WAV file suitable for VAD and turn-detection tests.
      *
      * <p>Preference order:
      * <ol>

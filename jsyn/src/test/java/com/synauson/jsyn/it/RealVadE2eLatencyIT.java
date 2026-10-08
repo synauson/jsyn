@@ -39,7 +39,7 @@ class RealVadE2eLatencyIT {
         String confId = "latency-it-" + ts;
         String pid = "lat-p-" + ts;
 
-        // VAD requires actual speech — a pure sine will not trigger sentito-1.
+        // VAD requires actual speech — a pure sine will not trigger VAD.
         Path speechWav = JSynTestHelpers.resolveSynausonRepo()
                 .resolve("synauson-server/tests/fixtures/short_speech.wav");
         Assumptions.assumeTrue(speechWav.toFile().exists(),
