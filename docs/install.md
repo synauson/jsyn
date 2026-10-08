@@ -74,7 +74,7 @@ sudo apt-get install -y libgstreamer1.0-0 gstreamer1.0-plugins-base \
 - `gstreamer1.0-tools` provides `gst-inspect-1.0` for the check below. jsyn itself
   doesn't need it.
 - `ca-certificates` is the trust store the engine uses for HTTPS to
-  `license.synauson.com` and `dl.synauson.com`. Minimal images may lack it.
+  `license.synauson.com` and the model downloads from Cloudflare R2. Minimal images may lack it.
 
 jsyn's CI also installs `gstreamer1.0-plugins-ugly` and `gstreamer1.0-libav`.
 
@@ -176,7 +176,7 @@ Nothing printed after the version means every element is present. Then run the
 | Direction | Endpoint | Why |
 |---|---|---|
 | Outbound HTTPS | `license.synauson.com` | Exchanges the license key for a signed license at startup, and renews it about once a day |
-| Outbound HTTPS | `dl.synauson.com` | Downloads the models the license includes, once per model version |
+| Outbound HTTPS | `*.r2.cloudflarestorage.com` (Cloudflare R2) | Downloads the models the license includes, once per model version |
 | Outbound HTTPS | `maven.synauson.com` | The jsyn jars, at build time only |
 | Outbound UDP 19302 | `stun.l.google.com` | The default STUN server for WebRTC; change it with `JSynConfig.Builder.webrtcStunServer` |
 | Inbound and outbound UDP | The SIP RTP range | `rtpPortMin` to `rtpPortMax` (default 10000 to 20000) |

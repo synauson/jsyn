@@ -96,6 +96,7 @@ jobs:
         env:
           SYNAUSON_MODELS_ACCESS_KEY_ID: ${{ secrets.SYNAUSON_MODELS_ACCESS_KEY_ID }}
           SYNAUSON_MODELS_SECRET_ACCESS_KEY: ${{ secrets.SYNAUSON_MODELS_SECRET_ACCESS_KEY }}
+          SYNAUSON_MODELS_ENDPOINT: ${{ secrets.SYNAUSON_MODELS_ENDPOINT }}
         run: |
           script=synauson-repo/tools/models-fetch/fetch-models.sh
           echo "curl: $(command -v curl), $(curl --version | sed -n 1p)"
@@ -210,6 +211,7 @@ jobs:
         env:
           SYNAUSON_MODELS_ACCESS_KEY_ID: ${{ secrets.SYNAUSON_MODELS_ACCESS_KEY_ID }}
           SYNAUSON_MODELS_SECRET_ACCESS_KEY: ${{ secrets.SYNAUSON_MODELS_SECRET_ACCESS_KEY }}
+          SYNAUSON_MODELS_ENDPOINT: ${{ secrets.SYNAUSON_MODELS_ENDPOINT }}
         run: |
           script=synauson-repo/tools/models-fetch/fetch-models.sh
           echo "curl: $(command -v curl), $(curl --version | sed -n 1p)"

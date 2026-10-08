@@ -31,7 +31,7 @@ signalling events.
 | ONNX Runtime | Nothing to install. 1.24.4 ships inside the `jsyn-natives-*` jar. |
 | GPU | Not used: inference runs on the CPU, and no NVIDIA software is needed. GPU support is planned. |
 | License key | Required. Free-tier keys work. Get one at [synauson.com](https://synauson.com). |
-| Network | At startup the engine exchanges the key at `license.synauson.com` and downloads the models your license includes from `dl.synauson.com`. See [offline hosts](#licensing-and-models) if the host has no internet access. |
+| Network | At startup the engine exchanges the key at `license.synauson.com` and downloads the models your license includes from Cloudflare R2 (`*.r2.cloudflarestorage.com`). See [offline hosts](#licensing-and-models) if the host has no internet access. |
 
 [`docs/install.md`](docs/install.md) has the full steps, the supported Linux
 distributions, firewall rules, hardware sizing for speech-to-text, and installation
