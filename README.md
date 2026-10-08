@@ -277,9 +277,8 @@ participant does. `conf.streamAgentEvents(id, options, observer)` delivers it as
 `AgentEvent`s for any participant with `TurnDetectionConfig` (and the `VadConfig` that
 drives it); without turn detection it throws `AgentStreamException` with reason
 `TURN_DETECTION_REQUIRED`. It carries speech activity, the turn lifecycle, with STT
-each turn's words, and with a speaker what it played (see
-[Speaking into the call](#speaking-into-the-call)); early (eager) end of turn comes in a
-later release.
+each turn's words, when you turn it on an early (eager) end of turn, and with a speaker
+what it played (see [Speaking into the call](#speaking-into-the-call)).
 
 | Event | Fields | When |
 |---|---|---|
@@ -289,6 +288,8 @@ later release.
 | `SpeechStopped` | `atMs`, `speechMs` | VAD heard it stop; `speechMs` is how long it lasted |
 | `TurnStarted` | `turnId`, `startMs`, `wordBacked` | A turn started: with STT on its first word (`wordBacked` true), without STT on VAD's speech start. `startMs` is VAD's speech start either way. |
 | `TurnWords` | `turnId`, `words`, `sttBacklogMs` | More of the open turn's words, each once it is complete (below) |
+| `EagerEndOfTurn` | `turnId`, `text`, `words`, `speechEndMs`, `probability`, latency fields | The turn has probably ended at a pause turn detection hasn't confirmed; only with eager on (below) |
+| `TurnResumed` | `turnId`, `cause`, `atMs` | The last `EagerEndOfTurn` was premature: the turn goes on (below) |
 | `EndOfTurn` | `turnId`, `reason`, `text`, `words`, `startMs`, `speechEndMs`, `probability`, `complete`, latency fields | The turn ended (below) |
 | `TurnConfigUpdated` | `config` | `updateTurnConfig` changed the turn config |
 | `UtteranceStarted` | `utteranceId`, `atMs`, `timeToFirstAudioMs`, `egressDelayMs` | The speaker's first sample of an utterance played |
@@ -329,6 +330,20 @@ finds no words in (a cough, noise) is not on the agent stream at all. Without ST
 still speaking); the latency fields (`sinceSpeechEndMs`, `decisionMs`, `drainMs`,
 `sttBacklogMs`) are durations, null when not known.
 
+**Eager end of turn.** With `eager` on in the turn config, a pause that probably ends
+the turn sends an `EagerEndOfTurn` before turn detection confirms it: at VAD's speech end
+when `eagerThreshold` is 0, else when turn detection's probability for the pause reaches
+`eagerThreshold` (at most the end-of-turn threshold). Its `text` and `words` are what the
+turn's `EndOfTurn` will carry if this pause ends it, so you can start your reply (an
+LLM request, say) early. If the participant speaks again and turn detection doesn't call the
+pause the turn's end, or committed words differ from the eager text, a `TurnResumed`
+withdraws it (`cause` `SPEECH` or `WORDS`): drop that early work. An `EndOfTurn`'s text
+equals the last `EagerEndOfTurn`'s unless a `TurnResumed` came between them. A turn may
+have several eager ends, each after a resume. With STT, eager needs
+`JSynConfig.Builder.sttEager(true)` on the runtime, which sets decoding aside for the
+forecasts its text comes from (`Capabilities.SttCapacity.eager` reports it); without it,
+turning eager on for an STT participant throws `InvalidArgumentException`.
+
 **Words.** With STT, each `Word` has `text` (with its punctuation and no leading space,
 such as `Hello,`), `startMs`, `endMs` and `confidence`. A word goes out in a `TurnWords`
 once it is complete, which is when the model has committed the next word or the turn
@@ -354,7 +369,7 @@ mid-call (for more patience while a caller reads out a number, say) and returns 
 config in effect with the seq of the `TurnConfigUpdated` that announces it. Start a
 participant with a config other than the defaults with `TurnDetectionConfig.withTurns`.
 Thresholds are in [0, 1] and the timeout 0 to 60000 ms; anything else throws
-`InvalidArgumentException`, and eager end of turn can't be turned on yet. The threshold
+`InvalidArgumentException`. The threshold
 also decides `TurnDetectionEvent.TurnResult.turnComplete`, and timeouts and `forceEndTurn`
 also close a `TranscriptEvent.Turn`. Both calls throw `FailedPreconditionException`
 for a participant without turn detection.

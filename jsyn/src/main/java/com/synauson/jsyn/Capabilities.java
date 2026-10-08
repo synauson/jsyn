@@ -478,6 +478,13 @@ public final class Capabilities {
          * natives without the cache.
          */
         public final @Nullable String source;
+        /**
+         * Whether participants with STT may turn eager end of turn on (see
+         * {@link JSynConfig.Builder#sttEager}). {@code null} from natives without it.
+         *
+         * @since 1.6.0
+         */
+        public final @Nullable Boolean eager;
 
         private SttCapacity() {
             this.state = null;
@@ -493,6 +500,7 @@ public final class Capabilities {
             this.turnFlush = null;
             this.forecastReserve = null;
             this.source = null;
+            this.eager = null;
         }
     }
 

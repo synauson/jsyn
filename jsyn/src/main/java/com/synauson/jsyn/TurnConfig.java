@@ -16,9 +16,12 @@ import org.jspecify.annotations.Nullable;
 public final class TurnConfig {
     /** Turn detection's probability at or above which a pause ends the turn. */
     public final float endOfTurnThreshold;
-    /** Eager end of turn; always false for now. */
+    /** Whether eager end of turn is on: {@link com.synauson.jsyn.event.AgentEvent.EagerEndOfTurn} events. */
     public final boolean eager;
-    /** Kept for eager end of turn; at most {@link #endOfTurnThreshold}. */
+    /**
+     * Turn detection's probability at or above which a pause sends the eager end; 0 sends it
+     * at the speech end. At most {@link #endOfTurnThreshold}.
+     */
     public final float eagerThreshold;
     /** Silence after a speech end, in ms, that ends the turn anyway; 0 is off. */
     public final int endOfTurnTimeoutMs;

@@ -11,8 +11,10 @@ import org.jspecify.annotations.Nullable;
  * {@link com.synauson.jsyn.participant.Conference#updateTurnConfig}. Thresholds are in
  * {@code [0, 1]}, {@code eagerThreshold} at most {@code endOfTurnThreshold}, and
  * {@code endOfTurnTimeoutMs} 0 to 60000; the engine refuses anything else with an
- * {@link com.synauson.jsyn.exception.InvalidArgumentException}. Eager end of turn can't
- * be turned on yet. Serializes with snake_case keys ({@code end_of_turn_threshold}),
+ * {@link com.synauson.jsyn.exception.InvalidArgumentException}. Turning eager end of
+ * turn on for a participant with STT needs {@link com.synauson.jsyn.JSynConfig.Builder#sttEager}
+ * on the runtime (the engine reserves decoding for its forecasts); without it the engine
+ * refuses with an {@code InvalidArgumentException}. Serializes with snake_case keys ({@code end_of_turn_threshold}),
  * leaving out unset fields. Immutable; the {@code with*} methods return a copy.
  *
  * @since 1.6.0
@@ -25,11 +27,18 @@ public final class TurnConfigUpdate {
     @SerializedName("end_of_turn_threshold")
     public final @Nullable Float endOfTurnThreshold;
 
-    /** Eager end of turn. Not available yet: only {@code false} is accepted. */
+    /**
+     * Eager end of turn: send an {@link com.synauson.jsyn.event.AgentEvent.EagerEndOfTurn}
+     * when a pause probably ends the turn, before turn detection confirms it. Starts off.
+     */
     @SerializedName("eager")
     public final @Nullable Boolean eager;
 
-    /** Kept for eager end of turn; at most {@link #endOfTurnThreshold}. Starts at 0. */
+    /**
+     * Turn detection's probability at or above which a pause sends the eager end; 0 sends it
+     * at the speech end, before turn detection decides. At most {@link #endOfTurnThreshold}.
+     * Starts at 0.
+     */
     @SerializedName("eager_threshold")
     public final @Nullable Float eagerThreshold;
 

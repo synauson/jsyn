@@ -181,6 +181,14 @@ public final class JSynConfig {
      */
     public final @Nullable Integer maxTtsStreams;
 
+    /**
+     * Allow eager end of turn with STT, reserving decoding for its forecasts.
+     * {@code null}: the engine default, off. See {@link Builder#sttEager}.
+     *
+     * @since 1.6.0
+     */
+    public final @Nullable Boolean sttEager;
+
     private JSynConfig(Builder b) {
         this.modelStore = b.modelStore;
         this.licenseKey = b.licenseKey;
@@ -206,6 +214,7 @@ public final class JSynConfig {
         this.ttsWorkers = b.ttsWorkers;
         this.ttsThreads = b.ttsThreads;
         this.maxTtsStreams = b.maxTtsStreams;
+        this.sttEager = b.sttEager;
     }
 
     /**
@@ -258,6 +267,7 @@ public final class JSynConfig {
         private @Nullable Integer ttsWorkers;
         private @Nullable Integer ttsThreads;
         private @Nullable Integer maxTtsStreams;
+        private @Nullable Boolean sttEager;
 
         /**
          * Override the STT pool's calibrated shape and stream cap. Each {@code null}
@@ -348,6 +358,24 @@ public final class JSynConfig {
             this.ttsWorkers = workers;
             this.ttsThreads = threads;
             this.maxTtsStreams = maxStreams;
+            return this;
+        }
+
+        /**
+         * Allow eager end of turn ({@link com.synauson.jsyn.TurnConfig#eager}) for
+         * participants with STT. Its text needs a forecast of the turn's last words at
+         * each pause, so calibration sets decoding aside for them, as for
+         * {@link #sttTurnFlush}; {@link Capabilities.SttCapacity#eager} reports it. Without
+         * it, turning eager on for an STT participant is refused. Natives without the
+         * option ignore it.
+         *
+         * @param on {@code true} to allow eager end of turn with STT, or {@code null} for
+         *        the engine default (off)
+         * @return this builder
+         * @since 1.6.0
+         */
+        public Builder sttEager(@Nullable Boolean on) {
+            this.sttEager = on;
             return this;
         }
 

@@ -17,17 +17,24 @@ import org.jspecify.annotations.Nullable;
  * {@link com.synauson.jsyn.participant.Conference#streamAgentEvents}. The subclasses
  * are the event kinds: {@link Subscribed}, {@link Heartbeat}, {@link Error},
  * {@link StreamEnded}, {@link SpeechStarted}, {@link SpeechStopped},
- * {@link TurnStarted}, {@link TurnWords}, {@link EndOfTurn}, {@link TurnConfigUpdated},
- * and, for a participant with a speaker, {@link UtteranceStarted}, {@link WordsPlayed},
- * {@link UtteranceDone}, {@link UtteranceInterrupted} and {@link UtteranceFailed}. The
- * engine adds kinds over time (eager end of turn comes next); an older jsyn receives
- * those as {@link Unknown}, so handle the kinds you know and ignore the rest.
+ * {@link TurnStarted}, {@link TurnWords}, {@link EagerEndOfTurn}, {@link TurnResumed},
+ * {@link EndOfTurn}, {@link TurnConfigUpdated}, and, for a participant with a speaker,
+ * {@link UtteranceStarted}, {@link WordsPlayed}, {@link UtteranceDone},
+ * {@link UtteranceInterrupted} and {@link UtteranceFailed}. The engine adds kinds over
+ * time; an older jsyn receives those as {@link Unknown}, so handle the kinds you know and
+ * ignore the rest.
  *
  * <p><b>Turns.</b> Turn ids rise by one from 1. Each {@link TurnStarted} is followed by
  * exactly one {@link EndOfTurn} for it, and no event of a turn comes before the
  * previous turn's {@code EndOfTurn}. {@link SpeechStarted} and {@link SpeechStopped}
  * carry no turn and come at once. With STT a turn starts with its first word, and its
  * {@link TurnWords}, in order, are exactly its {@code EndOfTurn}'s words.
+ *
+ * <p><b>Eager end of turn</b> (opt in with {@link TurnConfig#eager}): an
+ * {@link EagerEndOfTurn} says the open turn has probably ended, with the text its
+ * {@code EndOfTurn} will carry if it has, so you can start your reply early. A
+ * {@link TurnResumed} withdraws it. An {@code EndOfTurn}'s text equals the last
+ * {@code EagerEndOfTurn}'s unless a {@code TurnResumed} came between them.
  *
  * <p><b>Playback.</b> With a speaker
  * ({@link com.synauson.jsyn.spec.TtsConfig}), every utterance that plays any audio gets
@@ -117,6 +124,8 @@ public abstract class AgentEvent {
             case "speechStopped": return new SpeechStopped(o);
             case "turnStarted": return new TurnStarted(o);
             case "turnWords": return new TurnWords(o);
+            case "eagerEndOfTurn": return new EagerEndOfTurn(o);
+            case "turnResumed": return new TurnResumed(o);
             case "endOfTurn": return new EndOfTurn(o);
             case "turnConfigUpdated": return new TurnConfigUpdated(o);
             case "utteranceStarted": return new UtteranceStarted(o);
@@ -346,6 +355,87 @@ public abstract class AgentEvent {
             this.turnId = number(o, "turnId");
             this.words = Word.listFromJson(o.get("words"));
             this.sttBacklogMs = optionalNumber(o, "sttBacklogMs");
+        }
+    }
+
+    /**
+     * The open turn may have ended at a pause turn detection hasn't confirmed. Its text is
+     * what the turn's {@link EndOfTurn} will carry if this pause ends it. A turn may have
+     * several, each after a {@link TurnResumed}.
+     *
+     * @since 1.6.0
+     */
+    public static final class EagerEndOfTurn extends AgentEvent {
+        /** The turn. */
+        public final long turnId;
+        /** Its words joined by single spaces; empty without STT. */
+        public final String text;
+        /**
+         * The turn's words up to the pause: the ones its {@link TurnWords} carried so far,
+         * then any forecast words not yet committed. Empty without STT.
+         */
+        public final List<Word> words;
+        /** Conference time the pause's speech ended (VAD's speech end). */
+        public final long speechEndMs;
+        /**
+         * Turn detection's probability for the pause when the eager end came on its decision;
+         * null when it came at the speech end (an eager threshold of 0).
+         */
+        public final @Nullable Float probability;
+        /** How long the eager end took, in ms (durations); a field is null when not known. */
+        public final @Nullable Long sinceSpeechEndMs;
+        /** Turn detection's decision, queued plus inference. */
+        public final @Nullable Long decisionMs;
+        /** Waiting for STT's text. */
+        public final @Nullable Long drainMs;
+        /** Audio waiting to be transcribed, with STT. */
+        public final @Nullable Long sttBacklogMs;
+
+        EagerEndOfTurn(JsonObject o) {
+            super(o);
+            this.turnId = number(o, "turnId");
+            this.text = string(o, "text");
+            this.words = Word.listFromJson(o.get("words"));
+            this.speechEndMs = number(o, "speechEndMs");
+            JsonElement p = o.get("probability");
+            this.probability = p == null || p.isJsonNull() ? null : p.getAsFloat();
+            JsonElement l = o.get("latency");
+            JsonObject latency = l != null && l.isJsonObject() ? l.getAsJsonObject() : new JsonObject();
+            this.sinceSpeechEndMs = optionalNumber(latency, "sinceSpeechEndMs");
+            this.decisionMs = optionalNumber(latency, "decisionMs");
+            this.drainMs = optionalNumber(latency, "drainMs");
+            this.sttBacklogMs = optionalNumber(latency, "sttBacklogMs");
+        }
+    }
+
+    /**
+     * The turn's last {@link EagerEndOfTurn} was premature: the turn goes on, and that
+     * text no longer stands. At most one per {@code EagerEndOfTurn}.
+     *
+     * @since 1.6.0
+     */
+    public static final class TurnResumed extends AgentEvent {
+        /** The participant spoke again and turn detection didn't call the pause the turn's end. */
+        public static final String SPEECH = "SPEECH";
+        /** Committed words differ from the eager text. */
+        public static final String WORDS = "WORDS";
+
+        /** The turn. */
+        public final long turnId;
+        /** Why: {@link #SPEECH}, {@link #WORDS}, or a newer cause. */
+        public final String cause;
+        /**
+         * For {@link #SPEECH}, conference time the speech restarted. For {@link #WORDS},
+         * when the first differing word was emitted, or when the turn ended if its
+         * {@link EndOfTurn} is what differs.
+         */
+        public final long atMs;
+
+        TurnResumed(JsonObject o) {
+            super(o);
+            this.turnId = number(o, "turnId");
+            this.cause = string(o, "cause");
+            this.atMs = number(o, "atMs");
         }
     }
 

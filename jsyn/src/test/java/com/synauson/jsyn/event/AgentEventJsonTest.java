@@ -289,6 +289,34 @@ class AgentEventJsonTest {
     }
 
     @Test
+    void readsEagerEndOfTurnAndTurnResumed() {
+        AgentEvent.EagerEndOfTurn eager = assertInstanceOf(AgentEvent.EagerEndOfTurn.class, parse(9,
+            "\"type\":\"eagerEndOfTurn\",\"turnId\":1,\"text\":\"hello\","
+                + "\"words\":[{\"text\":\"hello\",\"startMs\":1200,\"endMs\":1360,\"confidence\":0.5}],"
+                + "\"speechEndMs\":2500,\"probability\":0.4,"
+                + "\"latency\":{\"sinceSpeechEndMs\":120,\"decisionMs\":30,\"drainMs\":90,\"sttBacklogMs\":80}"));
+        assertEquals(1, eager.turnId);
+        assertEquals("hello", eager.text);
+        assertEquals(1, eager.words.size());
+        assertEquals(2500, eager.speechEndMs);
+        assertEquals(0.4f, eager.probability, 1e-6);
+        assertEquals(120L, eager.sinceSpeechEndMs);
+        assertEquals(90L, eager.drainMs);
+
+        AgentEvent.EagerEndOfTurn atSpeechEnd = assertInstanceOf(AgentEvent.EagerEndOfTurn.class,
+            parse(10, "\"type\":\"eagerEndOfTurn\",\"turnId\":2,\"text\":\"\",\"words\":[],"
+                + "\"speechEndMs\":3000,\"latency\":{}"));
+        assertNull(atSpeechEnd.probability, "absent at an eager threshold of 0");
+        assertNull(atSpeechEnd.decisionMs);
+
+        AgentEvent.TurnResumed resumed = assertInstanceOf(AgentEvent.TurnResumed.class,
+            parse(11, "\"type\":\"turnResumed\",\"turnId\":1,\"cause\":\"SPEECH\",\"atMs\":2700"));
+        assertEquals(1, resumed.turnId);
+        assertEquals(AgentEvent.TurnResumed.SPEECH, resumed.cause);
+        assertEquals(2700, resumed.atMs);
+    }
+
+    @Test
     void turnCommandsReadAndWriteTheEnginesJson() {
         AppliedTurnConfig applied = AppliedTurnConfig.fromJson("{\"config\":" + CONFIG + ",\"seq\":9}");
         assertConfig(applied.config);
@@ -316,9 +344,9 @@ class AgentEventJsonTest {
 
     @Test
     void aKindFromANewerEngineIsUnknownNotAnError() {
-        String json = "{" + ENVELOPE + "\"seq\":7,\"type\":\"eagerEndOfTurn\",\"turnId\":1}";
+        String json = "{" + ENVELOPE + "\"seq\":7,\"type\":\"kindFromTheFuture\",\"turnId\":1}";
         AgentEvent.Unknown u = assertInstanceOf(AgentEvent.Unknown.class, AgentEvent.fromJson(json));
-        assertEquals("eagerEndOfTurn", u.type);
+        assertEquals("kindFromTheFuture", u.type);
         assertEquals(json, u.json);
         assertEquals(7, u.seq, "the envelope is still read");
         assertEquals("p", u.participantId);
