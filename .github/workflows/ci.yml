@@ -202,14 +202,6 @@ jobs:
           ssh-key: ${{ secrets.SYNAUSON_DEPLOY_KEY }}
           path: synauson-repo
 
-      # The checkout starts without models/; the fetch below downloads only
-      # files that are missing or don't match (the STT encoder is 650 MB).
-      - name: Cache synauson's model files
-        uses: actions/cache@v4
-        with:
-          path: synauson-repo/models
-          key: ${{ runner.os }}-models-${{ hashFiles('synauson-repo/tools/models-fetch/manifest.tsv') }}
-
       # synauson's model files live in a private bucket, and synauson ships a
       # dependency-free script to fetch them. A synauson that still keeps the
       # models in git has no script, and this step does nothing there.
