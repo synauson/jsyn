@@ -144,6 +144,7 @@ class WebRtcOptionsE2eIT {
                 .webrtcStunServer("")
                 .webrtcJitterBufferMs(120)
                 .webrtcIcePortRange(range[0], range[1])
+                .sttCapacity(null, null, 0)
                 .build())) {
             Conference conf = defaults.startConference("webrtc-defaults-" + System.nanoTime());
             try (WebRtcBrowserPeer browser = new WebRtcBrowserPeer()) {

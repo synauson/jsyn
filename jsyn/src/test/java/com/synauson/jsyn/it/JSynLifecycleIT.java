@@ -11,6 +11,7 @@ class JSynLifecycleIT {
     static JSynConfig cfg() {
         return JSynConfig.builder()
             .modelStore(JSynTestHelpers.modelStore().toString())
+            .sttCapacity(null, null, 0)
             .build();
     }
 

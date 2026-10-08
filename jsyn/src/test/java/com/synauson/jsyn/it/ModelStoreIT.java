@@ -29,14 +29,18 @@ class ModelStoreIT {
     }
 
     @Test
-    void importInstallsEveryPinnedModelInTheStoreLayoutAndIsIdempotent(@TempDir Path store)
+    void importInstallsModelsInTheStoreLayoutAndIsIdempotent(@TempDir Path tmp)
             throws Exception {
-        assertEquals(List.of("sentito-1", "fermata-1"),
-                JSyn.importModels(workspaceModels(), store));
+        // The two detector models only: the STT model is 650 MB.
+        Path src = Files.createDirectory(tmp.resolve("src"));
+        for (String f : List.of("sentito-1.onnx", "fermata-1.onnx")) {
+            Files.copy(workspaceModels().resolve(f), src.resolve(f));
+        }
+        Path store = tmp.resolve("store");
+        assertEquals(List.of("sentito-1", "fermata-1"), JSyn.importModels(src, store));
         assertTrue(Files.isRegularFile(store.resolve("sentito-1/5/sentito-1.onnx")));
         assertTrue(Files.isRegularFile(store.resolve("fermata-1/1.0.0-cpu/fermata-1.onnx")));
-        assertEquals(List.of("sentito-1", "fermata-1"),
-                JSyn.importModels(workspaceModels(), store));
+        assertEquals(List.of("sentito-1", "fermata-1"), JSyn.importModels(src, store));
     }
 
     @Test

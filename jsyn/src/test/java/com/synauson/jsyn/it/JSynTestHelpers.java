@@ -79,12 +79,17 @@ final class JSynTestHelpers {
         return PORT_BASE.getAndAdd(200);
     }
 
-    /** Create a new JSyn instance allocating RTP ports from {@code [rtpMin, rtpMin + 199]}. */
+    /**
+     * Create a new JSyn instance allocating RTP ports from {@code [rtpMin, rtpMin + 199]}.
+     * STT is off: a runtime licensed for it otherwise loads and times the STT model in
+     * the background, and no test here decodes speech.
+     */
     static JSyn newJSyn(int rtpMin) {
         return new JSyn(JSynConfig.builder()
                 .modelStore(modelStore().toString())
                 .rtpPortMin(rtpMin)
                 .rtpPortMax(rtpMin + 199)
+                .sttCapacity(null, null, 0)
                 .build());
     }
 
