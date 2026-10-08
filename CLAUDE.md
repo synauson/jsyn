@@ -116,9 +116,10 @@ package and put `<!-- snippet: <name> -->` on the line before the README's code 
 - After a release, bump the snapshot version in `build.gradle.kts` to the next minor, and
   update the README's install snippets (Gradle and Maven) and the pairing sentence under
   "Versions".
-- Publishing needs the `MAVEN_*` settings (`MAVEN_RELEASES_URL` or
-  `MAVEN_SNAPSHOTS_URL`, `MAVEN_USER`, `MAVEN_PASSWORD`). Without them the publish task
-  does not exist, so it cannot be run locally.
+- Publishing writes to the R2 bucket behind `maven.synauson.com` with Gradle's S3
+  transport. It needs `R2_PUBLISH_ACCESS_KEY_ID`, `R2_PUBLISH_SECRET_ACCESS_KEY` and
+  `-Dorg.gradle.s3.endpoint=$R2_PUBLISH_ENDPOINT` (the workflows pass all three from
+  secrets). Without the key the publish task does not exist, so it cannot be run locally.
 
 ## Keeping this file true
 
