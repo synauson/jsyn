@@ -262,8 +262,123 @@ call `read`.
 Errors are unchecked subclasses of `JSynException`, named after the failure:
 `InvalidArgumentException`, `NotFoundException`, `AlreadyExistsException`,
 `FailedPreconditionException`, `PermissionDeniedException`, `LimitExceededException`, and
-others. The public API is `@NullMarked` (JSpecify): nothing is null unless it is marked
+others. The agent event stream's `AgentStreamException` also carries a stable
+`reason()`. The public API is `@NullMarked` (JSpecify): nothing is null unless it is marked
 `@Nullable`.
+
+### Voice-agent event stream (preview)
+
+An agent that talks with a participant needs one ordered stream of what that
+participant does. `conf.streamAgentEvents(id, options, observer)` delivers it as
+`AgentEvent`s for any participant with `TurnDetectionConfig` (and the `VadConfig` that
+drives it); without turn detection it throws `AgentStreamException` with reason
+`TURN_DETECTION_REQUIRED`. It is a preview: it carries speech activity now, and turn
+events (turn started, words, early and confirmed end of turn) come in later releases.
+
+| Event | Fields | When |
+|---|---|---|
+| `Subscribed` | `oldestSeq`, `lastSeq`, `stt` | First on every subscription: the oldest event the stream keeps, its newest seq, whether STT runs |
+| `Heartbeat` | `conferenceMs`, `sttDecodedMs`, `sttBacklogMs` | Whenever nothing else came for the heartbeat interval (default 1000 ms, `withHeartbeatMs`) |
+| `SpeechStarted` | `atMs`, `probability` | VAD heard speech start. Raw voice activity: noise can start it too. |
+| `SpeechStopped` | `atMs`, `speechMs` | VAD heard it stop; `speechMs` is how long it lasted |
+| `Error` | `reason`, `message`, `metadata`, `turnId` | A recoverable problem; the stream goes on |
+| `StreamEnded` | `reason` | Last: the participant was removed or the conference terminated. `onCompleted` follows. |
+| `Unknown` | `type`, `json` | A kind from a newer engine. Ignore it, but it still has a seq. |
+
+Every event has `conferenceId`, `participantId`, `streamId`, `seq` and
+`timestampUnixMs` (wall clock). Times such as `atMs` and `conferenceMs` are conference
+time: the conference's pipeline clock in ms, the same for all its participants, so you
+can compare one participant's speech with another's. `atMs` is where the speech really
+started or stopped, so it is earlier than the event by up to VAD's `minSpeechMs` or
+`minSilenceMs`.
+
+**Order, seq and resume.** Every subscriber sees the events in one order. `seq` rises
+by one with each stored event, from 1; `Subscribed` and `Heartbeat` aren't stored
+(`isStored()` is false) and repeat the last seq you have. `streamId` names the
+participant's stream: a participant removed and added again under the same id gets a
+new one, with seqs from 1. The engine keeps each stream's last 512 events.
+`AgentStreamOptions.defaults()` replays all of them, then goes live.
+`AgentStreamOptions.resumeAfter(lastEvent)` continues after the last stored event you
+processed, without losing or repeating one. A cursor older than what is kept throws
+`AGENT_REPLAY_EXPIRED`, and one from a stream the participant no longer has throws
+`AGENT_STREAM_MISMATCH`; subscribe again with `defaults()`.
+
+**Lag.** The observer runs on an engine thread, and the engine never waits for it. An
+observer 256 events behind is dropped: it gets the events already queued, then
+`onError` with an `AgentStreamException` whose reason is `AGENT_SUBSCRIBER_LAGGED` and
+whose `lastSeq()` is the last one it got. Hand events to your own queue so this
+doesn't happen, and resume when it does. Subscribe again from another thread, never
+from inside the observer:
+
+<!-- snippet: agent-stream -->
+```java
+import com.synauson.jsyn.AgentStreamOptions;
+import com.synauson.jsyn.EventStreamObserver;
+import com.synauson.jsyn.Subscription;
+import com.synauson.jsyn.event.AgentEvent;
+import com.synauson.jsyn.exception.AgentStreamException;
+import com.synauson.jsyn.participant.Conference;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.Executor;
+
+/** Reads a participant's agent stream into a queue, resuming it after a lag. */
+public class AgentStreamReader implements EventStreamObserver<AgentEvent> {
+    private final Conference conf;
+    private final String participantId;
+    private final BlockingQueue<AgentEvent> events; // your agent's thread takes from it
+    private final Executor executor;                // resubscribes off the engine thread
+    private volatile AgentEvent lastStored;         // the resume cursor
+    private volatile Subscription subscription;
+
+    public AgentStreamReader(Conference conf, String participantId,
+                             BlockingQueue<AgentEvent> events, Executor executor) {
+        this.conf = conf;
+        this.participantId = participantId;
+        this.events = events;
+        this.executor = executor;
+    }
+
+    public void start() {
+        subscription = conf.streamAgentEvents(participantId, AgentStreamOptions.defaults(), this);
+    }
+
+    @Override
+    public void onNext(AgentEvent event) {
+        if (event.isStored()) {
+            lastStored = event;
+        }
+        events.add(event); // quick: never block the engine thread
+    }
+
+    @Override
+    public void onError(Throwable t) {
+        if (!(t instanceof AgentStreamException)) {
+            return;
+        }
+        AgentStreamException e = (AgentStreamException) t;
+        AgentEvent last = lastStored;
+        boolean lagged = e.reason().equals(AgentStreamException.AGENT_SUBSCRIBER_LAGGED);
+        executor.execute(() -> {
+            subscription.close();
+            try {
+                // After a lag, continue exactly after the last event this reader got.
+                subscription = conf.streamAgentEvents(participantId, lagged && last != null
+                    ? AgentStreamOptions.resumeAfter(last)
+                    : AgentStreamOptions.defaults(), this);
+            } catch (AgentStreamException expired) {
+                // AGENT_REPLAY_EXPIRED: what followed the cursor is gone; start afresh.
+                subscription = conf.streamAgentEvents(participantId,
+                    AgentStreamOptions.defaults(), this);
+            }
+        });
+    }
+
+    @Override
+    public void onCompleted() {
+        // StreamEnded came first: the participant or the conference is gone.
+    }
+}
+```
 
 ### Licensing and models
 
@@ -304,6 +419,7 @@ API.
 | Route audio between participants | [SipMixedSourcesE2eIT], [SipReserveConnectE2eIT] | `updatePartyAudioConnections`: growing the matrix mid-call, one destination mixing a native and a SIP source, and a two-way call as two one-way entries |
 | Voice activity detection | [VadDetectorIT], [RealVadE2eLatencyIT] | `VadConfig.defaults()`, a self-connection so audio reaches the detector, then `VadEvent.SpeechStart` |
 | End-of-turn detection | [TurnDetectionIT] | `TurnDetectionConfig` alongside VAD, then `TurnDetectionEvent.TurnResult` |
+| Voice-agent event stream | [AgentStreamIT] | `streamAgentEvents`: `Subscribed` first, speech events in conference time, resuming from a cursor, `StreamEnded` on removal, and `TURN_DETECTION_REQUIRED` without turn detection |
 | Streaming speech-to-text | [SttIT] | `SttConfig` needs `TurnDetectionConfig`, `streamTranscriptEvents` needs STT on the participant, and `capabilities().stt`. Transcript content is tested on the engine side. |
 | Model store and missing models | [ModelStoreIT] | `JSyn.importModels` is idempotent and rejects corrupt files. A missing model throws `FailedPreconditionException` and leaves nothing half-built. |
 | Inbound SIP call | [SipParticipantIT], [SipMediaE2eIT] | `addSipParticipant`, `localRtpPort()` for your SDP, real RTP both ways, VAD on a SIP caller |
@@ -330,6 +446,7 @@ their javadoc. `capabilities()` is covered by the licensing tour.
 [RealVadE2eLatencyIT]: jsyn/src/test/java/com/synauson/jsyn/it/RealVadE2eLatencyIT.java
 [TurnDetectionIT]: jsyn/src/test/java/com/synauson/jsyn/it/TurnDetectionIT.java
 [SttIT]: jsyn/src/test/java/com/synauson/jsyn/it/SttIT.java
+[AgentStreamIT]: jsyn/src/test/java/com/synauson/jsyn/it/AgentStreamIT.java
 [ModelStoreIT]: jsyn/src/test/java/com/synauson/jsyn/it/ModelStoreIT.java
 [SipParticipantIT]: jsyn/src/test/java/com/synauson/jsyn/it/SipParticipantIT.java
 [SipMediaE2eIT]: jsyn/src/test/java/com/synauson/jsyn/it/SipMediaE2eIT.java

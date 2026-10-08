@@ -317,6 +317,27 @@ public final class NativeBridge {
                                                          EventStreamObserver<?> listener);
 
     /**
+     * Subscribe to a participant's voice-agent event stream.
+     *
+     * <p>Each event reaches {@code listener.onNext} as one JSON string, read by
+     * {@code AgentEvent.fromJson}. A stream that ends early calls {@code onError} with an
+     * {@code AgentStreamException}; {@code StreamEnded} is followed by {@code onCompleted}.
+     *
+     * @param handle      runtime handle
+     * @param confId      conference identifier
+     * @param pid         participant identifier
+     * @param afterSeq    resume after this seq; -1 for every kept event
+     * @param streamId    the cursor's stream; -1 for any
+     * @param heartbeatMs heartbeat interval in ms; 0 or less for the default
+     * @param listener    observer receiving JSON strings
+     * @return opaque subscription ID; pass to {@link #unsubscribe} to cancel
+     * @since 1.6.0
+     */
+    public static native long subscribeAgentEvents(long handle, String confId, String pid,
+                                                    long afterSeq, long streamId, int heartbeatMs,
+                                                    EventStreamObserver<?> listener);
+
+    /**
      * Subscribe to file playback events for a participant.
      *
      * @param handle   runtime handle

@@ -1,9 +1,11 @@
 package com.synauson.jsyn.participant;
 
+import com.synauson.jsyn.AgentStreamOptions;
 import com.synauson.jsyn.ConferenceState;
 import com.synauson.jsyn.EventStreamObserver;
 import com.synauson.jsyn.ResourceSnapshot;
 import com.synauson.jsyn.Subscription;
+import com.synauson.jsyn.event.AgentEvent;
 import com.synauson.jsyn.event.DtmfEvent;
 import com.synauson.jsyn.event.FileEvent;
 import com.synauson.jsyn.event.IceCandidateEvent;
@@ -419,6 +421,117 @@ public final class Conference extends NativeResource {
         long subId = NativeBridge.subscribeTranscriptEvents(runtimeHandle, conferenceId,
                                                              participantId, (EventStreamObserver<?>) observer);
         return new Subscription(subId);
+    }
+
+    /**
+     * Subscribe to a participant's voice-agent event stream (preview), from every event
+     * the stream still keeps. Same as {@link #streamAgentEvents(String,
+     * AgentStreamOptions, EventStreamObserver)} with {@link AgentStreamOptions#defaults()}.
+     *
+     * @param participantId a participant added with a
+     *                      {@link com.synauson.jsyn.spec.TurnDetectionConfig}
+     * @param observer      receives {@link AgentEvent}s
+     * @return a {@link Subscription} that cancels the stream when closed
+     * @throws com.synauson.jsyn.exception.AgentStreamException with reason
+     *         {@code TURN_DETECTION_REQUIRED} if the participant has no turn detection
+     * @throws com.synauson.jsyn.exception.NotFoundException if there is no such participant
+     * @since 1.6.0
+     */
+    public Subscription streamAgentEvents(String participantId,
+                                          EventStreamObserver<AgentEvent> observer) {
+        return streamAgentEvents(participantId, AgentStreamOptions.defaults(), observer);
+    }
+
+    /**
+     * Subscribe to a participant's voice-agent event stream (preview): one ordered stream
+     * of {@link AgentEvent}s for an agent that talks with the participant, which needs a
+     * {@link com.synauson.jsyn.spec.TurnDetectionConfig} (and the VAD that drives it).
+     *
+     * <p>{@link AgentEvent.Subscribed} comes first, then the events the stream keeps after
+     * the cursor in {@code options} (all it keeps, its last 512, without one), then live
+     * events, with an {@link AgentEvent.Heartbeat} whenever nothing else came for the
+     * heartbeat interval. {@link AgentEvent.StreamEnded} is last, when the participant or
+     * the conference goes, and {@code onCompleted} follows. Turn events come in later
+     * releases and reach an older jsyn as {@link AgentEvent.Unknown}.
+     *
+     * <p><b>Lag and resume.</b> The observer runs on an engine thread and the engine never
+     * waits for it: an observer 256 events behind is dropped, and {@code onError} gets an
+     * {@link com.synauson.jsyn.exception.AgentStreamException} with reason
+     * {@code AGENT_SUBSCRIBER_LAGGED} and the last seq it was given. To resume without
+     * losing or repeating an event, keep the last stored event you processed and
+     * subscribe again from it:
+     *
+     * <pre>{@code
+     * void onError(Throwable t) {
+     *     if (t instanceof AgentStreamException) {
+     *         AgentStreamException e = (AgentStreamException) t;
+     *         AgentStreamOptions from = e.reason().equals(AgentStreamException.AGENT_SUBSCRIBER_LAGGED)
+     *             ? AgentStreamOptions.resumeAfter(lastStored)   // the last stored event handled
+     *             : AgentStreamOptions.defaults();
+     *         // Subscribe again off the engine thread, e.g. on your executor.
+     *         executor.execute(() -> conf.streamAgentEvents(pid, from, this));
+     *     }
+     * }
+     * }</pre>
+     *
+     * A resume whose cursor the stream no longer keeps throws {@code AGENT_REPLAY_EXPIRED},
+     * and one from a stream the participant no longer has (it was added again) throws
+     * {@code AGENT_STREAM_MISMATCH}: subscribe again with
+     * {@link AgentStreamOptions#defaults()}. Hand events to your own queue rather than
+     * working in {@code onNext}, so the observer keeps up.
+     *
+     * @param participantId a participant added with a
+     *                      {@link com.synauson.jsyn.spec.TurnDetectionConfig}
+     * @param options       where to start and the heartbeat interval
+     * @param observer      receives {@link AgentEvent}s
+     * @return a {@link Subscription} that cancels the stream when closed
+     * @throws com.synauson.jsyn.exception.NativeResourceClosedException if this conference is closed
+     * @throws com.synauson.jsyn.exception.InvalidArgumentException if an argument is null,
+     *         or the cursor is past the stream's newest event
+     * @throws com.synauson.jsyn.exception.AgentStreamException with reason
+     *         {@code TURN_DETECTION_REQUIRED}, {@code AGENT_REPLAY_EXPIRED} or
+     *         {@code AGENT_STREAM_MISMATCH}
+     * @throws com.synauson.jsyn.exception.NotFoundException if there is no such participant
+     * @since 1.6.0
+     */
+    public Subscription streamAgentEvents(String participantId, AgentStreamOptions options,
+                                          EventStreamObserver<AgentEvent> observer) {
+        requireOpen();
+        Args.notNull(participantId, "participantId");
+        Args.notNull(options, "options");
+        Args.notNull(observer, "observer");
+        long subId = NativeBridge.subscribeAgentEvents(runtimeHandle, conferenceId, participantId,
+            options.afterSeq(), options.streamId(), options.heartbeatMs(),
+            new AgentEventParser(observer));
+        return new Subscription(subId);
+    }
+
+    /** Turns the engine's JSON strings into {@link AgentEvent}s for the caller's observer. */
+    private static final class AgentEventParser implements EventStreamObserver<String> {
+        private final EventStreamObserver<AgentEvent> observer;
+
+        AgentEventParser(EventStreamObserver<AgentEvent> observer) {
+            this.observer = observer;
+        }
+
+        @Override
+        public void onNext(String json) {
+            AgentEvent event;
+            try {
+                event = AgentEvent.fromJson(json);
+            } catch (RuntimeException e) {
+                System.getLogger("com.synauson.jsyn")
+                    .log(System.Logger.Level.WARNING, "unreadable agent event dropped", e);
+                return;
+            }
+            observer.onNext(event);
+        }
+
+        @Override
+        public void onError(Throwable t) { observer.onError(t); }
+
+        @Override
+        public void onCompleted() { observer.onCompleted(); }
     }
 
     /**
