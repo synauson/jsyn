@@ -91,7 +91,7 @@ repositories {
 }
 
 val jsynVersion = "1.5.0"
-val jsynNativesVersion = "1.5.0" // see "Versions" below
+val jsynNativesVersion = "1.5.1" // see "Versions" below
 
 dependencies {
     implementation("com.synauson:jsyn:$jsynVersion")
@@ -105,7 +105,7 @@ Maven:
 ```xml
 <properties>
   <jsyn.version>1.5.0</jsyn.version>
-  <jsyn.natives.version>1.5.0</jsyn.natives.version>
+  <jsyn.natives.version>1.5.1</jsyn.natives.version>
 </properties>
 
 <repositories>
@@ -363,7 +363,9 @@ For more detail, rerun with `SYNAUSON_LOG_LEVEL=debug`.
 the engine, and jsyn is released from this repository. Each jsyn release needs natives at
 or above the `jsynNativesVersion` in that release's
 [`gradle.properties`](gradle.properties), and CI tests it against exactly that version.
-Use that pairing. For jsyn 1.5.0 it is natives 1.5.0.
+A natives release can come without a jsyn release when only the engine changed, so use
+the newest natives that CI tests with your jsyn version. For jsyn 1.5.0 that is natives
+1.5.1.
 
 Every push to `main` publishes a snapshot of the next minor version to
 `https://maven.synauson.com/snapshots`. Tags `v*` publish releases. In the javadoc,

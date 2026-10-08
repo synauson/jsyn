@@ -51,6 +51,11 @@ A new native call needs a natives release from synauson, then a bump of
 `jsynNativesVersion` in `gradle.properties` with a paragraph there saying what that
 version adds. The fallback default in `jsyn/build.gradle.kts` must match.
 
+jsyn and the natives drift: an engine-only fix ships as a natives release with no jsyn
+release. After every natives release, bump `jsynNativesVersion` (with its paragraph)
+and the README's natives version in the install snippets and under "Versions", so CI
+tests the newest natives and the docs recommend them.
+
 ## The JNI contract
 
 - Every `static native` method in `internal/NativeBridge.java` has a matching
