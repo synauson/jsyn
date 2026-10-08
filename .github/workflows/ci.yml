@@ -41,15 +41,17 @@ jobs:
           distribution: temurin
           java-version: '11'
 
-      - name: Cache Gradle wrapper + caches
-        uses: actions/cache@v4
+      # test-linux's Gradle cache (a superset of what this job needs),
+      # restored but never saved: one entry instead of three.
+      - name: Restore Gradle wrapper + caches
+        uses: actions/cache/restore@v4
         with:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', 'gradle/wrapper/gradle-wrapper.properties') }}
+          key: ${{ runner.os }}-gradle-test-${{ hashFiles('**/*.gradle*', 'gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: |
-            ${{ runner.os }}-gradle-
+            ${{ runner.os }}-gradle-test-
 
       - name: compile jsyn sources and tests, check README snippets
         run: ./gradlew :jsyn:compileJava :jsyn:compileTestJava :jsyn:checkReadmeSnippets --no-daemon --console=plain
@@ -189,8 +191,6 @@ jobs:
     runs-on: gh-runner-w
     needs: java-compile
     timeout-minutes: 45
-    env:
-      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.playwright-browsers
     steps:
       - uses: actions/checkout@v4
 
@@ -225,37 +225,56 @@ jobs:
             echo "no $script in this synauson checkout; models come from git"
             exit 0
           fi
-          sh "$script" synauson-repo/models
+          # gh-runner-w is one persistent machine: keep the models in the
+          # runner's tool cache (the script skips files whose digest already
+          # matches) and hardlink them into the checkout's models/.
+          store="$(cygpath -u "$RUNNER_TOOL_CACHE")/synauson-models"
+          sh "$script" "$store"
+          mkdir -p synauson-repo/models
+          grep -v '^#' synauson-repo/tools/models-fetch/manifest.tsv | cut -f3 | tr -d '\r' |
+            while read -r file; do
+              [ -n "$file" ] || continue
+              ln -f "$store/$file" "synauson-repo/models/$file" ||
+                cp -f "$store/$file" "synauson-repo/models/$file"
+            done
+          echo "linked models from $store"
 
-      - name: Cache GStreamer + ORT installer downloads
-        id: cache-deps
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/gst-runtime.msi
-            ~/onnxruntime-win-x64.zip
-          key: win-test-deps-gst-1.26.7-ort-1.24.4-v1
-
-      - name: Download GStreamer runtime MSI (cache miss only)
-        if: steps.cache-deps.outputs.cache-hit != 'true'
+      # gh-runner-w is persistent, so GStreamer and ONNX Runtime normally stay
+      # installed. Installers are downloaded only when an install is missing,
+      # into the runner's tool cache rather than the Actions cache.
+      - name: Install GStreamer runtime + ONNX Runtime (if missing)
         shell: pwsh
         run: |
-          Invoke-WebRequest `
-            -Uri "https://gstreamer.freedesktop.org/data/pkg/windows/1.26.7/msvc/gstreamer-1.0-msvc-x86_64-1.26.7.msi" `
-            -OutFile (Join-Path $HOME 'gst-runtime.msi')
-
-      - name: Install GStreamer runtime (system-wide, silent)
-        shell: pwsh
-        run: |
+          $dl = Join-Path $env:RUNNER_TOOL_CACHE 'synauson-downloads'
+          New-Item -ItemType Directory -Force -Path $dl | Out-Null
+          function Get-Download([string]$url) {
+            $dest = Join-Path $dl ([IO.Path]::GetFileName($url))
+            if (-not (Test-Path $dest)) {
+              Invoke-WebRequest -Uri $url -OutFile "$dest.part"
+              Move-Item -Force "$dest.part" $dest
+            }
+            return $dest
+          }
           if (Test-Path 'C:\gstreamer\1.0\msvc_x86_64\bin\gstreamer-1.0-0.dll') {
             Write-Host "GStreamer already installed, skipping."
           } else {
-            $msi = Join-Path $HOME 'gst-runtime.msi'
+            $msi = Get-Download "https://gstreamer.freedesktop.org/data/pkg/windows/1.26.7/msvc/gstreamer-1.0-msvc-x86_64-1.26.7.msi"
             $proc = Start-Process msiexec.exe -Wait -PassThru -ArgumentList @(
               '/i', $msi, '/quiet', '/norestart', 'ADDLOCAL=ALL', 'INSTALLDIR=C:\gstreamer\')
             if ($proc.ExitCode -ne 0) { throw "msiexec failed with exit code $($proc.ExitCode)" }
           }
           "C:\gstreamer\1.0\msvc_x86_64\bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          if (Test-Path 'C:\ort\onnxruntime-win-x64-1.24.4') {
+            Write-Host "ORT already extracted, skipping."
+          } else {
+            $zip = Get-Download "https://github.com/microsoft/onnxruntime/releases/download/v1.24.4/onnxruntime-win-x64-1.24.4.zip"
+            New-Item -ItemType Directory -Force -Path C:\ort | Out-Null
+            Expand-Archive -Path $zip -DestinationPath C:\ort -Force
+          }
+          "C:\ort\onnxruntime-win-x64-1.24.4\lib" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          # Chromium stays in the tool cache too; the install task skips it
+          # when present.
+          "PLAYWRIGHT_BROWSERS_PATH=$(Join-Path $env:RUNNER_TOOL_CACHE 'ms-playwright')" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       # The first gst_init() for a user scans every installed plugin through
       # gst-plugin-scanner and caches the result under %LOCALAPPDATA%\gstreamer-1.0
@@ -271,47 +290,13 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "gst-inspect-1.0 failed: $LASTEXITCODE" }
           Write-Host "GStreamer registry built in $($sw.Elapsed.TotalSeconds) s"
 
-      - name: Download + extract ONNX Runtime (cache miss only)
-        if: steps.cache-deps.outputs.cache-hit != 'true'
-        shell: pwsh
-        run: |
-          Invoke-WebRequest `
-            -Uri "https://github.com/microsoft/onnxruntime/releases/download/v1.24.4/onnxruntime-win-x64-1.24.4.zip" `
-            -OutFile "$HOME/onnxruntime-win-x64.zip"
-
-      - name: Extract ONNX Runtime
-        shell: pwsh
-        run: |
-          if (Test-Path 'C:\ort\onnxruntime-win-x64-1.24.4') {
-            Write-Host "ORT already extracted, skipping."
-          } else {
-            New-Item -ItemType Directory -Force -Path C:\ort | Out-Null
-            Expand-Archive -Path "$HOME/onnxruntime-win-x64.zip" -DestinationPath C:\ort -Force
-          }
-          "C:\ort\onnxruntime-win-x64-1.24.4\lib" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
-
-      - name: Cache Playwright Chromium
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.PLAYWRIGHT_BROWSERS_PATH }}
-          key: ${{ runner.os }}-playwright-chromium-1.47.0
-
       - name: Set up Temurin 11
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '11'
 
-      - name: Cache Gradle wrapper + caches
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-test-${{ hashFiles('**/*.gradle*', 'gradle/wrapper/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-test-
-
+      # No Gradle cache: ~/.gradle persists on gh-runner-w.
       - name: Install Playwright Chromium
         shell: pwsh
         run: ./gradlew.bat :jsyn:installPlaywrightBrowsers --no-daemon --console=plain
@@ -364,15 +349,16 @@ jobs:
           distribution: temurin
           java-version: '11'
 
-      - name: Cache Gradle wrapper + caches
-        uses: actions/cache@v4
+      # test-linux's Gradle cache, restored but never saved (see java-compile).
+      - name: Restore Gradle wrapper + caches
+        uses: actions/cache/restore@v4
         with:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-snapshot-${{ hashFiles('**/*.gradle*', 'gradle/wrapper/gradle-wrapper.properties') }}
+          key: ${{ runner.os }}-gradle-test-${{ hashFiles('**/*.gradle*', 'gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: |
-            ${{ runner.os }}-gradle-snapshot-
+            ${{ runner.os }}-gradle-test-
 
       - name: publish jsyn snapshot
         env:
