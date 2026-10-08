@@ -9,6 +9,21 @@ on:
 
 jobs:
   # -------------------------------------------------------------------------
+  # Agent docs (CLAUDE.md) against the repository: paths, Gradle tasks and
+  # env vars it names, and its size. tools/check-agent-docs.py is a copy of
+  # the synauson repo's.
+  # -------------------------------------------------------------------------
+  agent-docs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check agent docs
+        env:
+          AGENT_DOCS_DENY: ${{ secrets.AGENT_DOCS_DENY }}
+        run: python3 tools/check-agent-docs.py --github
+
+  # -------------------------------------------------------------------------
   # Compile pure-Java sources to catch API regressions without needing the
   # native platform JARs, and check the README's code blocks match the test
   # sources they are copied from (checkReadmeSnippets in jsyn/build.gradle.kts).
