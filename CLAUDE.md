@@ -26,8 +26,9 @@ Without `-DsynausonRepoDir`, the tests look for a synauson checkout next to this
 Model files aren't in synauson's git, so fill the checkout's `models/` first:
 `<checkout>/tools/models-fetch/fetch-models.sh <checkout>/models` (POSIX sh and curl
 7.75+; Git Bash on Windows). It downloads from a private bucket and needs
-`SYNAUSON_MODELS_ACCESS_KEY_ID` and `SYNAUSON_MODELS_SECRET_ACCESS_KEY`, a read-only key
-a maintainer hands out. CI runs it with those repository secrets right after it checks
+`SYNAUSON_MODELS_ACCESS_KEY_ID`, `SYNAUSON_MODELS_SECRET_ACCESS_KEY` and
+`SYNAUSON_MODELS_ENDPOINT` (the bucket's Cloudflare R2 endpoint), a read-only key a
+maintainer hands out. CI runs it with those repository secrets right after it checks
 out synauson.
 
 `-PjsynNativesVersion=<v>` overrides the natives version for one run.
