@@ -94,7 +94,7 @@ public final class JSyn extends NativeResource {
      * @param modelStore store to fill, or {@code null} for the default store (see
      *                   {@link JSynConfig#modelStore})
      * @return ids of the models now installed from {@code from}, such as
-     *         {@code "sentito-1"}
+     *         {@code "sentito-1"}, in catalog order (VAD, turn detection, STT, TTS)
      * @throws com.synauson.jsyn.exception.InvalidArgumentException if {@code from} is
      *         null or holds no model files
      * @throws com.synauson.jsyn.exception.FailedPreconditionException if a model file in
@@ -132,6 +132,7 @@ public final class JSyn extends NativeResource {
      * @param modelStore store to read, or {@code null} for the default store (see
      *                   {@link JSynConfig#modelStore})
      * @return notice text by model id, such as {@code "lettura-1"}, in catalog order
+     *         (VAD, turn detection, STT, TTS)
      * @throws com.synauson.jsyn.exception.FailedPreconditionException if a notice in the
      *         store fails verification
      * @since 1.6.0
