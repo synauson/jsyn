@@ -43,18 +43,21 @@ subprojects {
                 from(components.findByName("java"))
             }
         }
-        // CI publishes with MAVEN_RELEASES_URL or MAVEN_SNAPSHOTS_URL (chosen by the
-        // version) plus MAVEN_USER and MAVEN_PASSWORD. Without the URL the "synauson"
-        // repository doesn't exist, so the publish task named after it fails fast.
-        val snapshot = version.toString().endsWith("-SNAPSHOT")
-        System.getenv(if (snapshot) "MAVEN_SNAPSHOTS_URL" else "MAVEN_RELEASES_URL")?.let { target ->
+        // CI publishes to the R2 bucket behind https://maven.synauson.com
+        // (releases/ or snapshots/, chosen by the version) with Gradle's S3
+        // transport: R2_PUBLISH_ACCESS_KEY_ID and R2_PUBLISH_SECRET_ACCESS_KEY,
+        // plus -Dorg.gradle.s3.endpoint=$R2_PUBLISH_ENDPOINT on the command line.
+        // Without the key the "synauson" repository doesn't exist, so the publish
+        // task named after it fails fast.
+        val prefix = if (version.toString().endsWith("-SNAPSHOT")) "snapshots" else "releases"
+        System.getenv("R2_PUBLISH_ACCESS_KEY_ID")?.let { keyId ->
             repositories {
                 maven {
                     name = "synauson"
-                    url = uri(target)
-                    credentials {
-                        username = System.getenv("MAVEN_USER")
-                        password = System.getenv("MAVEN_PASSWORD")
+                    url = uri("s3://synauson-maven/$prefix")
+                    credentials(AwsCredentials::class) {
+                        accessKey = keyId
+                        secretKey = System.getenv("R2_PUBLISH_SECRET_ACCESS_KEY")
                     }
                 }
             }
