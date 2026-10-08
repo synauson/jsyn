@@ -70,10 +70,10 @@ class SpecValidationTest {
 
     @Test
     void webRtcParticipantSpecReportsMissingFields() {
-        assertInvalid("WebRtcParticipantSpec requires participantId, sdpOffer, stunServer",
+        assertInvalid("WebRtcParticipantSpec requires participantId, sdpOffer",
             () -> WebRtcParticipantSpec.builder().build());
-        assertInvalid("WebRtcParticipantSpec requires stunServer",
-            () -> WebRtcParticipantSpec.builder().participantId("w").sdpOffer("v=0").build());
+        assertInvalid("WebRtcParticipantSpec requires sdpOffer",
+            () -> WebRtcParticipantSpec.builder().participantId("w").build());
     }
 
     // --- optional fields stay optional ---------------------------------------

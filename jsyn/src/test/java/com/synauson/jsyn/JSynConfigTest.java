@@ -49,6 +49,15 @@ class JSynConfigTest {
     }
 
     @Test
+    void webrtcIcePortRangeIsSentOnlyWhenSet() {
+        String json = JSynConfig.builder().webrtcIcePortRange(40_000, 40_099).build().toJson();
+        assertTrue(json.contains("\"webrtcIcePortMin\":40000"), json);
+        assertTrue(json.contains("\"webrtcIcePortMax\":40099"), json);
+        String dflt = JSynConfig.builder().build().toJson();
+        assertFalse(dflt.contains("webrtcIcePort"), "an unset range is omitted: " + dflt);
+    }
+
+    @Test
     void toJsonCarriesModelStoreUnderTheNameTheNativeSideReads() {
         String json = JSynConfig.builder().modelStore("/opt/models").build().toJson();
         assertTrue(json.contains("\"modelStore\":\"/opt/models\""), json);

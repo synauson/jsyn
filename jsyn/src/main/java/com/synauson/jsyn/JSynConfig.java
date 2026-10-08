@@ -87,6 +87,21 @@ public final class JSynConfig {
     /** GStreamer webrtcbin jitter buffer latency in milliseconds for WebRTC participants. */
     public final int webrtcJitterBufferMs;
 
+    /**
+     * Lowest local ICE port for WebRTC participants that set no range of their own.
+     * {@code null} lets the ICE agent pick any port.
+     *
+     * @since 1.5.0
+     */
+    public final @Nullable Integer webrtcIcePortMin;
+
+    /**
+     * Highest local ICE port for WebRTC participants that set no range of their own.
+     *
+     * @since 1.5.0
+     */
+    public final @Nullable Integer webrtcIcePortMax;
+
     private JSynConfig(Builder b) {
         this.modelStore = b.modelStore;
         this.licenseKey = b.licenseKey;
@@ -100,6 +115,8 @@ public final class JSynConfig {
         this.rtpJitterBufferMs = b.rtpJitterBufferMs;
         this.webrtcStunServer = Args.notNull(b.webrtcStunServer, "webrtcStunServer");
         this.webrtcJitterBufferMs = b.webrtcJitterBufferMs;
+        this.webrtcIcePortMin = b.webrtcIcePortMin;
+        this.webrtcIcePortMax = b.webrtcIcePortMax;
     }
 
     /**
@@ -140,6 +157,8 @@ public final class JSynConfig {
         private int rtpJitterBufferMs = 200;
         private @Nullable String webrtcStunServer = "stun://stun.l.google.com:19302";
         private int webrtcJitterBufferMs = 200;
+        private @Nullable Integer webrtcIcePortMin;
+        private @Nullable Integer webrtcIcePortMax;
 
         /**
          * Set the model store the VAD and turn detection detectors load their models from.
@@ -272,6 +291,24 @@ public final class JSynConfig {
          * @return this builder
          */
         public Builder webrtcJitterBufferMs(int ms) { this.webrtcJitterBufferMs = ms; return this; }
+
+        /**
+         * Set the default local ICE port range, {@code min} through {@code max} (1 to 65535),
+         * for WebRTC participants that don't set one with
+         * {@link com.synauson.jsyn.spec.WebRtcParticipantSpec.Builder#icePortRange}.
+         * Default: any port. Keep it clear of the SIP range ({@code rtpPortMin} to
+         * {@code rtpPortMax}); both bind UDP ports on this host.
+         *
+         * @param min lowest port
+         * @param max highest port, at least {@code min}
+         * @return this builder
+         * @since 1.5.0
+         */
+        public Builder webrtcIcePortRange(int min, int max) {
+            this.webrtcIcePortMin = min;
+            this.webrtcIcePortMax = max;
+            return this;
+        }
 
         /**
          * Materialise an immutable {@link JSynConfig} from this builder's current state.
