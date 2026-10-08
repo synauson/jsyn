@@ -226,7 +226,9 @@ Streaming speech-to-text works the same way: add `SttConfig` next to `TurnDetect
 `conf.streamTranscriptEvents(id, observer)`. `TranscriptEvent.Delta` carries committed
 text as it is decoded, never revised. `TranscriptEvent.Turn` carries one turn's text
 when turn detection completes the turn; the turns' texts add up to the deltas' text, each
-word once. If the turn's text hasn't settled within `SttConfig.turnDrainMs` (default
+word once, except that a turn never starts with punctuation (the period ending the
+sentence before, which the model commits with the next word), so turns may end without
+one. If the turn's text hasn't settled within `SttConfig.turnDrainMs` (default
 1000 ms), the turn arrives with `complete == false` and its late words open the next
 turn. STT needs `FEATURE_STT` in the license. Its decoding pool loads in the background
 when the runtime starts; until `capabilities().stt.state` is `ready`, adding a
