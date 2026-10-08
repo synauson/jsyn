@@ -26,19 +26,21 @@ on. Both `linux` and `windows` natives can be on the classpath simultaneously â€
 All modules are published to the public Synauson Maven repository
 (`com.synauson` group): releases at `https://maven.synauson.com/releases`,
 snapshots at `https://maven.synauson.com/snapshots`. No credentials are needed.
+Use the same version for `jsyn` and its natives. Snapshots of the next release
+(`1.5.0-SNAPSHOT`) are rebuilt from `main`.
 
 ### Gradle
 
 ```kotlin
 repositories {
     mavenCentral()
-    maven { url = uri("https://maven.synauson.com/snapshots") }
+    maven { url = uri("https://maven.synauson.com/releases") }
 }
 
 dependencies {
-    implementation("com.synauson:jsyn:0.1.0-SNAPSHOT")
-    runtimeOnly("com.synauson:jsyn-natives-linux:0.1.0-SNAPSHOT")
-    runtimeOnly("com.synauson:jsyn-natives-windows:0.1.0-SNAPSHOT")
+    implementation("com.synauson:jsyn:1.4.0")
+    runtimeOnly("com.synauson:jsyn-natives-linux:1.4.0")
+    runtimeOnly("com.synauson:jsyn-natives-windows:1.4.0")
 }
 ```
 
@@ -49,12 +51,12 @@ dependencies {
   <dependency>
     <groupId>com.synauson</groupId>
     <artifactId>jsyn</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>1.4.0</version>
   </dependency>
   <dependency>
     <groupId>com.synauson</groupId>
     <artifactId>jsyn-natives-windows</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>1.4.0</version>
     <scope>runtime</scope>
   </dependency>
 </dependencies>
