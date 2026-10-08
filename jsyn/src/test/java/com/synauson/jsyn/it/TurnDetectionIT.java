@@ -4,6 +4,7 @@ import com.synauson.jsyn.JSyn;
 import com.synauson.jsyn.NativeAudioFormat;
 import com.synauson.jsyn.Subscription;
 import com.synauson.jsyn.event.TurnDetectionEvent;
+import com.synauson.jsyn.exception.InvalidArgumentException;
 import com.synauson.jsyn.participant.Conference;
 import com.synauson.jsyn.participant.NativeParticipant;
 import com.synauson.jsyn.spec.ConnectionEntry;
@@ -33,6 +34,28 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 @Timeout(value = 60, unit = TimeUnit.SECONDS)
 class TurnDetectionIT {
+
+    @Test
+    void turnDetectionWithoutVadIsRefused() {
+        long ts = System.nanoTime();
+        try (JSyn syn = JSynTestHelpers.newJSyn();
+             Conference conf = syn.startConference("turn-detection-it-no-vad-" + ts)) {
+            NativeParticipantSpec spec = NativeParticipantSpec.builder()
+                    .format(NativeAudioFormat.PCM_S16LE16K_MONO)
+                    .turnDetection(TurnDetectionConfig.defaults())
+                    .build();
+            NativeParticipant accepted = null;
+            try {
+                accepted = conf.addNativeParticipant("p", spec);
+            } catch (InvalidArgumentException e) {
+                assertTrue(e.getMessage().contains("turn_detection needs vad"), e.getMessage());
+            }
+            if (accepted != null) {
+                accepted.close();
+                Assumptions.abort("native runtime predates the turn detection needs VAD check");
+            }
+        }
+    }
 
     @Test
     void turnResultEventArrivesAfterEnoughAudio() throws Exception {

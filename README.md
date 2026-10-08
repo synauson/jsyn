@@ -223,14 +223,17 @@ nothing connected to it may carry no audio at all. That is why the detector test
 connect a participant to itself.
 
 To run a detector, put `VadConfig` (voice activity) or `TurnDetectionConfig` (end of
-turn, which needs VAD as well) on a participant's spec. Then subscribe with
+turn) on a participant's spec. The detectors form a chain, VAD, then turn detection, then
+STT, and each needs the one before it on the same participant: turn detection without
+`VadConfig` throws `InvalidArgumentException` ("turn_detection needs vad on the same
+participant"), and nothing is added for you. Then subscribe with
 `conf.streamVadEvents(id, observer)` after adding the participant, since the detector
 belongs to it. The same pattern works for turn detection, file, DTMF and ICE-candidate
 events. Each `stream*` call returns a `Subscription`. Observers run on
 an engine thread, so don't block in them; `onError` and `onCompleted` have defaults.
 
 Streaming speech-to-text works the same way: add `SttConfig` next to `TurnDetectionConfig`
-(STT without turn detection throws `InvalidArgumentException`) and read
+and `VadConfig` (STT without turn detection throws `InvalidArgumentException`) and read
 `conf.streamTranscriptEvents(id, observer)`. `TranscriptEvent.Delta` carries committed
 text as it is decoded, never revised. `TranscriptEvent.Turn` carries one turn's text
 when turn detection completes the turn; the turns' texts add up to the deltas' text, each
@@ -427,7 +430,7 @@ API.
 | One audio thread per participant | [NativeParticipantConcurrencyIT] | Five participants written from five threads. A full ring returns 0; it does not throw. |
 | Route audio between participants | [SipMixedSourcesE2eIT], [SipReserveConnectE2eIT] | `updatePartyAudioConnections`: growing the matrix mid-call, one destination mixing a native and a SIP source, and a two-way call as two one-way entries |
 | Voice activity detection | [VadDetectorIT], [RealVadE2eLatencyIT] | `VadConfig.defaults()`, a self-connection so audio reaches the detector, then `VadEvent.SpeechStart` |
-| End-of-turn detection | [TurnDetectionIT] | `TurnDetectionConfig` alongside VAD, then `TurnDetectionEvent.TurnResult` |
+| End-of-turn detection | [TurnDetectionIT] | `TurnDetectionConfig` alongside VAD (without VAD it throws `InvalidArgumentException`), then `TurnDetectionEvent.TurnResult` |
 | Voice-agent event stream | [AgentStreamIT] | `streamAgentEvents`: `Subscribed` first, speech events in conference time, resuming from a cursor, `StreamEnded` on removal, and `TURN_DETECTION_REQUIRED` without turn detection |
 | Streaming speech-to-text | [SttIT] | `SttConfig` needs `TurnDetectionConfig`, `streamTranscriptEvents` needs STT on the participant, and `capabilities().stt`. Transcript content is tested on the engine side. |
 | Model store and missing models | [ModelStoreIT] | `JSyn.importModels` is idempotent and rejects corrupt files. A missing model throws `FailedPreconditionException` and leaves nothing half-built. |
@@ -517,6 +520,7 @@ the state directory on volumes so that models and the license survive restarts.
 | WebRTC participants fail while SIP and file participants work | The ICE plugin is missing (`gstreamer1.0-nice`), or GStreamer is 1.28. |
 | `InvalidArgumentException: no license key configured: set SYNAUSON_LICENSE_KEY …` | Set the variable, or pass `licenseKey(...)`. |
 | `PermissionDeniedException: license.synauson.com refused this license key: …` | The key is wrong, expired or revoked. |
+| `InvalidArgumentException: turn_detection needs vad on the same participant: …` (or `stt needs turn_detection …`) | Each detector needs the one before it on the same participant. Add the `VadConfig` (or `TurnDetectionConfig`) it names. Older natives accepted turn detection without VAD, which then never ran. |
 | `FailedPreconditionException: model 'sentito-1' version 5 is not installed: …` | The model hasn't downloaded yet, or the host is offline. Wait until `capabilities().models` reports it ready, or run `JSyn.importModels`. |
 | First `new JSyn(...)` on Windows takes tens of seconds | GStreamer is building its plugin registry. Run `gst-inspect-1.0.exe coreelements` once per user. |
 

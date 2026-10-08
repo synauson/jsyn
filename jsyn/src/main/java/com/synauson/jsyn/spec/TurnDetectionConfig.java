@@ -9,7 +9,9 @@ import com.google.gson.annotations.SerializedName;
  * snake_case field names ({@code buffered_samples}, {@code confidence_threshold}).
  *
  * <p>The underlying detector is the turn detection ONNX model; see {@link #defaults()} for
- * production-recommended values.
+ * production-recommended values. It decides when VAD reports a speech end, so it needs a
+ * {@link VadConfig} on the same participant; without one, adding the participant throws
+ * {@link com.synauson.jsyn.exception.InvalidArgumentException}.
  *
  * @since 0.1.0
  */

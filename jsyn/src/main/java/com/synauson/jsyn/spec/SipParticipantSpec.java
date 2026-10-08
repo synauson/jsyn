@@ -38,7 +38,12 @@ public final class SipParticipantSpec {
     /** Optional VAD configuration; {@code null} disables VAD detection. */
     public final @Nullable VadConfig vad;
 
-    /** Optional TurnDetection configuration; {@code null} disables TurnDetection detection. */
+    /**
+     * Optional TurnDetection configuration; {@code null} disables TurnDetection detection. Needs
+     * {@link #vad} on the same participant, whose speech ends it decides on: turn detection
+     * without it is refused with an
+     * {@link com.synauson.jsyn.exception.InvalidArgumentException}.
+     */
     public final @Nullable TurnDetectionConfig turnDetection;
 
     /**
@@ -144,6 +149,7 @@ public final class SipParticipantSpec {
 
         /**
          * Enable TurnDetection detection on this participant's audio stream.
+         * Needs {@link #vad}, whose speech ends it decides on.
          *
          * @param st TurnDetection configuration, or {@code null} to disable
          * @return this builder

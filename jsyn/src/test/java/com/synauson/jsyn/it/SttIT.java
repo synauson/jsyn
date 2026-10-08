@@ -42,7 +42,7 @@ class SttIT {
                     .vad(VadConfig.defaults())
                     .stt(SttConfig.defaults())
                     .build()));
-            assertTrue(e.getMessage().contains("turn detection"), e.getMessage());
+            assertTrue(e.getMessage().contains("turn_detection"), e.getMessage());
         }
     }
 
