@@ -421,8 +421,19 @@ public final class Capabilities {
         public final @Nullable Integer threadsPerWorker;
         /** One stream's decode time over audio time, when measured. */
         public final @Nullable Double realTimeFactor;
-        /** Resident memory of one worker's model copy, when measured (Linux). */
+        /**
+         * The private memory each worker's model adds, when measured (Linux). Weights
+         * the workers share are counted once, in {@link #sharedModelBytes}.
+         */
         public final @Nullable Long modelBytes;
+        /**
+         * Model weights the workers share, paid once: the pool's model memory is about
+         * {@code workers * modelBytes + sharedModelBytes}. 0 when each worker loads its
+         * own copy; {@code null} until measured, or from natives without sharing.
+         *
+         * @since 1.6.0
+         */
+        public final @Nullable Long sharedModelBytes;
         /** What set the worker count: {@code "cpu"}, {@code "memory"} or {@code "operator"}. */
         public final @Nullable String limitedBy;
         /** The stream cap (once known) and the STT streams in use. */
@@ -457,6 +468,7 @@ public final class Capabilities {
             this.threadsPerWorker = null;
             this.realTimeFactor = null;
             this.modelBytes = null;
+            this.sharedModelBytes = null;
             this.limitedBy = null;
             this.streams = null;
             this.detail = null;

@@ -217,7 +217,11 @@ guide, not a guarantee, and check the numbers your own machine reports.
 - On current Intel server CPUs, STT ran about one real-time stream per vCPU. Older
   Intel server CPUs and AMD Genoa ran about half that.
 - An 8-core AVX2 desktop CPU (Ryzen 7 3700X) carried about 2 streams.
-- Each STT worker holds its own copy of the model, about 1.2 GB resident.
+- STT workers share one copy of the model's weights, about 600 MB of memory paid once,
+  mapped from a file the engine writes into the model store on its first STT start
+  (about 1.2 GB on disk). With a read-only model store each worker loads a private copy
+  instead, about 800 MB each. `capabilities().stt.sharedModelBytes` and `modelBytes`
+  report the split.
 - VAD and turn detection cost about 0.01 CPU core per call.
 - The [turn flush](../README.md#configuration-and-logging) (`sttTurnFlush`), when on,
   costs about 26% more CPU and lowers the stream cap by about a quarter.

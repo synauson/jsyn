@@ -18,7 +18,7 @@ class CapabilitiesTest {
         + "{\"id\":\"sentito-1\",\"version\":\"5\",\"release\":\"5.0.0\",\"state\":\"ready\",\"detail\":null},"
         + "{\"id\":\"fermata-1\",\"version\":\"1.0.0-cpu\",\"release\":\"1.0.0\",\"state\":\"missing\",\"detail\":\"not installed\"}],"
         + "\"stt\":{\"state\":\"ready\",\"calibrated\":true,\"workers\":3,\"threadsPerWorker\":5,"
-        + "\"realTimeFactor\":0.79,\"modelBytes\":1189294080,\"limitedBy\":\"cpu\","
+        + "\"realTimeFactor\":0.79,\"modelBytes\":64487424,\"sharedModelBytes\":603979776,\"limitedBy\":\"cpu\","
         + "\"streams\":{\"limit\":3,\"inUse\":1},\"detail\":null,"
         + "\"turnFlush\":true,\"forecastReserve\":0.384,\"source\":\"cached\"},"
         + "\"sessions\":{\"limit\":20,\"inUse\":17,\"ceiling\":25,\"level\":\"near-limit\","
@@ -86,7 +86,8 @@ class CapabilitiesTest {
         assertNotNull(c.stt);
         assertEquals("ready", c.stt.state);
         assertEquals(Boolean.TRUE, c.stt.calibrated);
-        assertEquals(Long.valueOf(1189294080L), c.stt.modelBytes);
+        assertEquals(Long.valueOf(64487424L), c.stt.modelBytes);
+        assertEquals(Long.valueOf(603979776L), c.stt.sharedModelBytes);
         assertEquals("cpu", c.stt.limitedBy);
         assertEquals(Integer.valueOf(3), c.stt.workers);
         assertEquals(Integer.valueOf(5), c.stt.threadsPerWorker);
