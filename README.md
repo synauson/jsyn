@@ -241,7 +241,8 @@ one. If the turn's text hasn't settled within `SttConfig.turnDrainMs` (default
 turn. `JSynConfig.Builder.sttTurnFlush(true)` closes such turns sooner, on a forecast of
 their last words. A turn can then arrive before the deltas of its last words, and when
 the speaker kept talking and the transcript changed, the next turn may repeat a word
-(see the `TranscriptEvent.Turn` javadoc). STT needs `FEATURE_STT` in the license. Its
+(see the `TranscriptEvent.Turn` javadoc). STT needs `FEATURE_STT` in the license, which
+includes turn detection and VAD. Its
 decoding pool loads in the background when the runtime starts; until
 `capabilities().stt.state` is `ready`, adding a participant with STT throws
 `FailedPreconditionException`. `capabilities().stt` also reports how many STT streams
@@ -390,6 +391,14 @@ the engine starts on the cached license. A capability your license lacks throws
 the new conference or detector; nothing already running is stopped.
 `jsyn.capabilities()` reports the license, its limits, current usage and the state of
 each model.
+
+Entitlements follow the detector chain: each includes the ones below it.
+`FEATURE_TURN_DETECTION` also runs VAD, and `FEATURE_STT` also runs turn detection and VAD.
+A participant counts one stream, for its highest detector: STT with its turn detection and
+VAD counts one `FEATURE_STT` stream. A capability your license grants only through a
+higher one reports `entitled` with `includedBy` naming that code, and its streams count
+against that code: under a license with only `FEATURE_TURN_DETECTION`, VAD on its own
+counts a `FEATURE_TURN_DETECTION` stream.
 
 The models (sentito-1, turn detection) download into the model store in the background.
 Adding a detector before its model is ready throws `FailedPreconditionException` naming

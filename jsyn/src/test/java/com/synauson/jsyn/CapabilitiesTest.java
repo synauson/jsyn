@@ -13,8 +13,10 @@ class CapabilitiesTest {
         + "\"conferences\":{\"limit\":10,\"inUse\":3},"
         + "\"aiConferences\":{\"limit\":2,\"inUse\":1},"
         + "\"capabilities\":["
-        + "{\"code\":\"FEATURE_VAD\",\"entitled\":true,\"streams\":{\"limit\":null,\"inUse\":0}},"
-        + "{\"code\":\"FEATURE_TURN_DETECTION\",\"entitled\":true,\"streams\":{\"limit\":4,\"inUse\":2}}],"
+        + "{\"code\":\"FEATURE_VAD\",\"entitled\":true,\"streams\":{\"limit\":null,\"inUse\":0},"
+        + "\"includedBy\":\"FEATURE_TURN_DETECTION\"},"
+        + "{\"code\":\"FEATURE_TURN_DETECTION\",\"entitled\":true,\"streams\":{\"limit\":4,\"inUse\":2},"
+        + "\"includedBy\":null}],"
         + "\"models\":["
         + "{\"id\":\"sentito-1\",\"version\":\"5\",\"release\":\"5.0.0\",\"state\":\"ready\",\"detail\":null},"
         + "{\"id\":\"fermata-1\",\"version\":\"1.0.0-cpu\",\"release\":\"1.0.0\",\"state\":\"missing\",\"detail\":\"not installed\"}],"
@@ -40,6 +42,8 @@ class CapabilitiesTest {
         assertNull(c.capabilities.get(0).streams.limit, "null is unlimited");
         assertEquals("FEATURE_TURN_DETECTION", c.capabilities.get(1).code);
         assertEquals(2, c.capabilities.get(1).streams.inUse);
+        assertEquals("FEATURE_TURN_DETECTION", c.capabilities.get(0).includedBy);
+        assertNull(c.capabilities.get(1).includedBy);
 
         assertEquals("ready", c.models.get(0).state);
         assertEquals("missing", c.models.get(1).state);
@@ -67,6 +71,15 @@ class CapabilitiesTest {
         assertNotNull(c.stt);
         assertNull(c.stt.turnFlush);
         assertNull(c.stt.forecastReserve);
+    }
+
+    @Test
+    void nativesOlderThanInclusionReportNoIncludedBy() {
+        String older = JSON.replace(",\"includedBy\":\"FEATURE_TURN_DETECTION\"", "")
+            .replace(",\"includedBy\":null", "");
+        Capabilities c = Capabilities.fromJson(older);
+        assertTrue(c.capabilities.get(0).entitled);
+        assertNull(c.capabilities.get(0).includedBy);
     }
 
     @Test

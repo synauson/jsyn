@@ -127,15 +127,32 @@ public final class Capabilities {
     public static final class CapabilityInfo {
         /** Entitlement code, e.g. {@code FEATURE_TURN_DETECTION}. */
         public final String code;
-        /** Whether the license includes it. */
+        /**
+         * Whether the license includes it, itself or through an entitlement that includes
+         * it: {@code FEATURE_STT} includes turn detection, which includes VAD.
+         */
         public final boolean entitled;
-        /** Concurrent streams using it (one per participant it runs on). */
+        /**
+         * Concurrent streams counted against it: one per participant whose highest
+         * detector it grants. The detectors below that one are included and count nothing.
+         */
         public final Usage streams;
+        /**
+         * The entitlement code that grants this capability when the license doesn't name
+         * it itself, e.g. {@code FEATURE_STT} for turn detection under a license with only
+         * {@code FEATURE_STT}. Streams of this capability then count against that one.
+         * {@code null} when the license names it, doesn't include it, or the natives
+         * predate inclusion.
+         *
+         * @since 1.6.0
+         */
+        public final @Nullable String includedBy;
 
         private CapabilityInfo() {
             this.code = null;
             this.entitled = false;
             this.streams = null;
+            this.includedBy = null;
         }
     }
 
