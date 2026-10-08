@@ -188,8 +188,14 @@ class WebRtcSttE2eIT {
 
                     // Each EndOfTurn's text is its turn transcript's, without the
                     // leading space. The transcript stream was open before any audio,
-                    // so it has every turn, in the same order; a turn without words is
-                    // on the transcript stream only.
+                    // so it has every turn, in the same order. Turns without words are
+                    // left out on both streams: newer natives never send one on the
+                    // agent stream, but 1.6.0 sends its EndOfTurn with empty text.
+                    List<AgentEvent.EndOfTurn> worded = new ArrayList<>();
+                    for (AgentEvent.EndOfTurn end : ends) {
+                        if (!end.text.isEmpty()) worded.add(end);
+                    }
+                    ends = worded;
                     List<TranscriptEvent.Turn> turns = new ArrayList<>();
                     while (turns.size() < ends.size()) {
                         Object o = transcripts.received.poll(30, TimeUnit.SECONDS);
