@@ -527,7 +527,8 @@ API.
 | End-of-turn detection | [TurnDetectionIT] | `TurnDetectionConfig` alongside VAD (without VAD it throws `InvalidArgumentException`), then `TurnDetectionEvent.TurnResult` |
 | Voice-agent turns | [AgentTurnsIT] | `TurnDetectionConfig.withTurns`, `forceEndTurn` ending the open turn with `MANUAL`, `updateTurnConfig` answered and announced, and the refusals |
 | Voice-agent event stream | [AgentStreamIT] | `streamAgentEvents`: `Subscribed` first, speech events in conference time, resuming from a cursor, `StreamEnded` on removal, and `TURN_DETECTION_REQUIRED` without turn detection |
-| Streaming speech-to-text | [SttIT] | `SttConfig` needs `TurnDetectionConfig`, `streamTranscriptEvents` needs STT on the participant, and `capabilities().stt`. Transcript content is tested on the engine side. |
+| Streaming speech-to-text | [SttIT] | `SttConfig` needs `TurnDetectionConfig`, `streamTranscriptEvents` needs STT on the participant, and `capabilities().stt` |
+| Speech-to-text on a WebRTC call | [WebRtcSttE2eIT] | A browser speaking into a participant with VAD, turn detection and STT: wait for `capabilities().stt.state` to be `ready`, subscribe before answering, then read the words from `EndOfTurn.text` and `TranscriptEvent.Turn`, joining turns (a turn that ran out of drain time hands its last words to the next) |
 | Model store and missing models | [ModelStoreIT] | `JSyn.importModels` is idempotent and rejects corrupt files. A missing model throws `FailedPreconditionException` and leaves nothing half-built. |
 | Inbound SIP call | [SipParticipantIT], [SipMediaE2eIT] | `addSipParticipant`, `localRtpPort()` for your SDP, real RTP both ways, VAD on a SIP caller |
 | Outbound SIP call (reserve, then connect) | [SipReserveConnectE2eIT] | Reserve the ports for the offer, connect with the answer's `SipRemoteMedia`, SRTP keys across the two phases, and releasing a reservation |
@@ -565,6 +566,7 @@ their javadoc. `capabilities()` is covered by the licensing tour.
 [WebRtcMediaE2eIT]: jsyn/src/test/java/com/synauson/jsyn/it/WebRtcMediaE2eIT.java
 [WebRtcNativeParticipantE2eIT]: jsyn/src/test/java/com/synauson/jsyn/it/WebRtcNativeParticipantE2eIT.java
 [WebRtcOptionsE2eIT]: jsyn/src/test/java/com/synauson/jsyn/it/WebRtcOptionsE2eIT.java
+[WebRtcSttE2eIT]: jsyn/src/test/java/com/synauson/jsyn/it/WebRtcSttE2eIT.java
 [SipRtpPeer]: jsyn/src/test/java/com/synauson/jsyn/it/support/SipRtpPeer.java
 [WebRtcBrowserPeer]: jsyn/src/test/java/com/synauson/jsyn/it/support/WebRtcBrowserPeer.java
 

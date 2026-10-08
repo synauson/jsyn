@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Streaming STT: what the engine refuses, and the STT capacity it reports. Transcript
- * content is tested on the engine side.
+ * content on a real call is in {@link WebRtcSttE2eIT}.
  */
 @Timeout(value = 60, unit = TimeUnit.SECONDS)
 class SttIT {

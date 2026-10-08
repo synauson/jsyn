@@ -82,7 +82,7 @@ final class JSynTestHelpers {
     /**
      * Create a new JSyn instance allocating RTP ports from {@code [rtpMin, rtpMin + 199]}.
      * STT is off: a runtime licensed for it otherwise loads and times the STT model in
-     * the background, and no test here decodes speech.
+     * the background. Tests that decode speech use {@link #newJSynWithStt()}.
      */
     static JSyn newJSyn(int rtpMin) {
         return new JSyn(JSynConfig.builder()
@@ -91,6 +91,48 @@ final class JSynTestHelpers {
                 .rtpPortMax(rtpMin + 199)
                 .sttCapacity(null, null, 0)
                 .build());
+    }
+
+    /**
+     * Create a JSyn instance with STT on: one decoding worker of four threads and two
+     * streams, which skips calibration (timed decodes at startup). The pool still loads
+     * in the background; wait for it with {@link #awaitSttReady}.
+     */
+    static JSyn newJSynWithStt() {
+        int rtpMin = nextRtpPortMin();
+        return new JSyn(JSynConfig.builder()
+                .modelStore(modelStore().toString())
+                .rtpPortMin(rtpMin)
+                .rtpPortMax(rtpMin + 199)
+                .sttCapacity(1, 4, 2)
+                .build());
+    }
+
+    /**
+     * Wait until {@code capabilities().stt.state} is {@code "ready"}. Adding a participant
+     * with STT before then throws, and closing a runtime while the pool loads can crash
+     * ONNX Runtime. Fails if the pool fails, or isn't ready in time ({@code idle} says
+     * why: no license yet, or no STT model in the store).
+     */
+    static void awaitSttReady(JSyn syn, java.time.Duration within) throws InterruptedException {
+        long deadline = System.nanoTime() + within.toNanos();
+        while (true) {
+            com.synauson.jsyn.Capabilities.SttCapacity stt = syn.capabilities().stt;
+            if (stt == null) {
+                throw new IllegalStateException("the native runtime reports no STT");
+            }
+            if ("ready".equals(stt.state)) {
+                return;
+            }
+            if ("failed".equals(stt.state)) {
+                throw new IllegalStateException("STT failed: " + stt.detail);
+            }
+            if (System.nanoTime() > deadline) {
+                throw new IllegalStateException("STT not ready within " + within + ": "
+                        + stt.state + " (" + stt.detail + ")");
+            }
+            Thread.sleep(200);
+        }
     }
 
     /**

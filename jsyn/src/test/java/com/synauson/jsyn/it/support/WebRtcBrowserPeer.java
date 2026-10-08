@@ -16,8 +16,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * A real headless Chromium browser acting as the WebRTC counterparty for
- * {@code WebRtcMediaE2eIT}: real ICE, real DTLS-SRTP, real Opus.
+ * A real headless Chromium browser acting as the WebRTC counterparty for the
+ * {@code WebRtc*E2eIT} tests: real ICE, real DTLS-SRTP, real Opus. A fake
+ * microphone file loops, so pauses in it recur.
  *
  * <p>Serves a tiny static page over {@code http://127.0.0.1} — a secure
  * context per the W3C spec's loopback exception, so {@code getUserMedia}

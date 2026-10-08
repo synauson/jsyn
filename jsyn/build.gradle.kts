@@ -61,7 +61,7 @@ tasks.test {
 
 tasks.register<JavaExec>("installPlaywrightBrowsers") {
     group = "verification"
-    description = "Downloads the Chromium build Playwright drives for WebRtcMediaE2eIT. " +
+    description = "Downloads the Chromium build Playwright drives for the WebRTC *E2eIT tests. " +
         "Set INSTALL_PLAYWRIGHT_DEPS=1 to also install Linux OS-level dependencies (CI only)."
     classpath = sourceSets.test.get().runtimeClasspath
     mainClass.set("com.microsoft.playwright.CLI")
