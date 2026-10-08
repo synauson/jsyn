@@ -82,7 +82,7 @@ public final class JSyn extends NativeResource {
 
     /**
      * Fill a model store from a flat folder of model files, such as
-     * {@code sentito-1.onnx} and {@code fermata-1.onnx}.
+     * {@code sentito-1.onnx} and {@code sentito-1-NOTICE.txt}.
      *
      * <p>Each model this jsyn release pins is copied into the store when all of its
      * files are in {@code from}, after its size and SHA-256 are verified. Models
@@ -118,6 +118,35 @@ public final class JSyn extends NativeResource {
     /** JSON shape returned by {@code NativeBridge.importModels}. */
     private static final class ImportResult {
         List<String> imported = new ArrayList<>();
+    }
+
+    /**
+     * The licence notice of each model in a model store: what the model derives from
+     * and under which licence. Every model ships its notice in its download, and
+     * redistributing a model means passing its notice on.
+     *
+     * <p>Each notice is checked against the size and SHA-256 this jsyn release pins
+     * before it is returned. Models whose notice isn't in the store are left out.
+     * Blocks while hashing. Needs no {@code JSyn} instance.
+     *
+     * @param modelStore store to read, or {@code null} for the default store (see
+     *                   {@link JSynConfig#modelStore})
+     * @return notice text by model id, such as {@code "lettura-1"}, in catalog order
+     * @throws com.synauson.jsyn.exception.FailedPreconditionException if a notice in the
+     *         store fails verification
+     * @since 1.6.0
+     */
+    public static Map<String, String> modelNotices(@Nullable Path modelStore) {
+        NativeLoader.load();
+        Map<String, @Nullable String> request = new LinkedHashMap<>();
+        request.put("modelStore",
+            modelStore == null ? null : modelStore.toAbsolutePath().toString());
+        request.put("model", null);
+        String json = NativeBridge.modelNotices(new GsonBuilder().serializeNulls().create()
+            .toJson(request));
+        Map<String, String> notices = new Gson().fromJson(json,
+            new com.google.gson.reflect.TypeToken<LinkedHashMap<String, String>>() { }.getType());
+        return Collections.unmodifiableMap(notices);
     }
 
     // -------------------------------------------------------------------------

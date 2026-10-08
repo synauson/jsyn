@@ -78,6 +78,15 @@ public final class NativeBridge {
      */
     public static native String importModels(String requestJson);
 
+    /**
+     * The licence notice of each model in a store, verified against the catalog. Needs
+     * no runtime handle.
+     *
+     * @param requestJson {@code {"modelStore": "<store>" | null, "model": "<model-id>" | null}}
+     * @return {@code {"<model-id>": "<notice text>", ...}}
+     */
+    public static native String modelNotices(String requestJson);
+
     // -------------------------------------------------------------------------
     // Conference lifecycle  (synauson-jni/src/exports/conference.rs)
     // -------------------------------------------------------------------------

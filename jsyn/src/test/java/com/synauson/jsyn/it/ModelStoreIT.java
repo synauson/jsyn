@@ -16,11 +16,15 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/** {@link JSyn#importModels} and how detectors behave when the store lacks a model. */
+/**
+ * {@link JSyn#importModels}, {@link JSyn#modelNotices} and how detectors behave when
+ * the store lacks a model.
+ */
 @Timeout(value = 60, unit = TimeUnit.SECONDS)
 class ModelStoreIT {
 
@@ -33,15 +37,24 @@ class ModelStoreIT {
             throws Exception {
         // The two detector models only: the STT model is 650 MB.
         Path src = Files.createDirectory(tmp.resolve("src"));
-        for (String f : List.of("sentito-1.onnx", "fermata-1.onnx")) {
+        for (String f : DETECTOR_FILES) {
             Files.copy(workspaceModels().resolve(f), src.resolve(f));
         }
         Path store = tmp.resolve("store");
         assertEquals(List.of("sentito-1", "fermata-1"), JSyn.importModels(src, store));
-        assertTrue(Files.isRegularFile(store.resolve("sentito-1/5/sentito-1.onnx")));
-        assertTrue(Files.isRegularFile(store.resolve("fermata-1/1.0.0-cpu/fermata-1.onnx")));
+        assertTrue(Files.isRegularFile(store.resolve("sentito-1/cpu/sentito-1.onnx")));
+        assertTrue(Files.isRegularFile(store.resolve("fermata-1/cpu/fermata-1.onnx")));
         assertEquals(List.of("sentito-1", "fermata-1"), JSyn.importModels(src, store));
+
+        Map<String, String> notices = JSyn.modelNotices(store);
+        assertEquals(List.of("sentito-1", "fermata-1"), List.copyOf(notices.keySet()));
+        assertTrue(notices.get("fermata-1").startsWith("fermata-1: third-party notice"),
+            notices.get("fermata-1"));
     }
+
+    /** The detector models' files, each model's notice among them. */
+    private static final List<String> DETECTOR_FILES = List.of(
+        "sentito-1.onnx", "sentito-1-NOTICE.txt", "fermata-1.onnx", "fermata-1-NOTICE.txt");
 
     @Test
     void importRejectsACorruptModelAndLeavesTheStoreWithoutIt(@TempDir Path tmp)
@@ -50,12 +63,14 @@ class ModelStoreIT {
         byte[] bytes = Files.readAllBytes(workspaceModels().resolve("sentito-1.onnx"));
         bytes[4096] ^= 0x5a;
         Files.write(src.resolve("sentito-1.onnx"), bytes);
+        Files.copy(workspaceModels().resolve("sentito-1-NOTICE.txt"),
+            src.resolve("sentito-1-NOTICE.txt"));
         Path store = tmp.resolve("store");
 
         FailedPreconditionException e = assertThrows(FailedPreconditionException.class,
                 () -> JSyn.importModels(src, store));
         assertTrue(e.getMessage().contains("sha256"), e.getMessage());
-        assertFalse(Files.exists(store.resolve("sentito-1/5/sentito-1.onnx")));
+        assertFalse(Files.exists(store.resolve("sentito-1/cpu/sentito-1.onnx")));
     }
 
     @Test

@@ -17,10 +17,10 @@ class CapabilitiesTest {
         + "{\"code\":\"FEATURE_STT\",\"entitled\":true,\"includedBy\":null},"
         + "{\"code\":\"FEATURE_TTS\",\"entitled\":true,\"includedBy\":null}],"
         + "\"models\":["
-        + "{\"id\":\"sentito-1\",\"version\":\"5\",\"release\":\"5.0.0\",\"state\":\"ready\",\"detail\":null},"
-        + "{\"id\":\"fermata-1\",\"version\":\"1.0.0-cpu\",\"release\":\"1.0.0\",\"state\":\"missing\",\"detail\":\"not installed\"},"
-        + "{\"id\":\"spartito-1\",\"version\":\"1.0.0-int8\",\"release\":\"1.0.0\",\"state\":\"ready\",\"detail\":null},"
-        + "{\"id\":\"lettura-1\",\"version\":\"1.0.0-fp32\",\"release\":\"1.0.0\",\"state\":\"downloading\",\"detail\":null}],"
+        + "{\"id\":\"sentito-1\",\"version\":\"cpu\",\"release\":\"1.0.0\",\"state\":\"ready\",\"detail\":null},"
+        + "{\"id\":\"fermata-1\",\"version\":\"cpu\",\"release\":\"1.0.0\",\"state\":\"missing\",\"detail\":\"not installed\"},"
+        + "{\"id\":\"spartito-1\",\"version\":\"int8\",\"release\":\"1.0.0\",\"state\":\"ready\",\"detail\":null},"
+        + "{\"id\":\"lettura-1\",\"version\":\"fp32\",\"release\":\"1.0.0\",\"state\":\"downloading\",\"detail\":null}],"
         + "\"stt\":{\"state\":\"ready\",\"calibrated\":true,\"workers\":3,\"threadsPerWorker\":5,"
         + "\"realTimeFactor\":0.79,\"modelBytes\":64487424,\"sharedModelBytes\":603979776,\"limitedBy\":\"cpu\","
         + "\"streams\":{\"limit\":3,\"inUse\":1},\"detail\":null,"
@@ -84,7 +84,7 @@ class CapabilitiesTest {
         assertEquals("not installed", c.models.get(1).detail);
         assertEquals(4, c.models.size());
         assertEquals("lettura-1", c.models.get(3).id);
-        assertEquals("1.0.0-fp32", c.models.get(3).version);
+        assertEquals("fp32", c.models.get(3).version);
         assertEquals("downloading", c.models.get(3).state);
 
         assertNotNull(c.resources);

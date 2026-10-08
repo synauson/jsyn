@@ -387,12 +387,12 @@ public final class Capabilities {
      */
     public static final class ModelInfo {
         /**
-         * Model id: {@code sentito-1}, {@code fermata-1}, {@code spartito-1} (STT) or
-         * {@code lettura-1} (TTS). Every model is listed; one the plan lacks is
+         * Model id: {@code sentito-1} (VAD), {@code fermata-1} (turn detection),
+         * {@code spartito-1} (STT) or {@code lettura-1} (TTS). Every model is listed; one the plan lacks is
          * {@code "not-entitled"}.
          */
         public final String id;
-        /** Directory name of this version in the model store. */
+        /** The variant the engine uses (e.g. {@code int8}): its directory in the model store. */
         public final String version;
         /** Published release version. */
         public final String release;
