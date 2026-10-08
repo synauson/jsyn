@@ -361,7 +361,9 @@ jobs:
 
       - name: publish jsyn snapshot
         env:
-          MAVEN_SNAPSHOTS_URL: ${{ secrets.MAVEN_SNAPSHOTS_URL }}
-          MAVEN_USER: ${{ secrets.MAVEN_USER }}
-          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
-        run: ./gradlew :jsyn:publishLibraryPublicationToSynausonRepository --no-daemon --console=plain
+          R2_PUBLISH_ENDPOINT: ${{ secrets.R2_PUBLISH_ENDPOINT }}
+          R2_PUBLISH_ACCESS_KEY_ID: ${{ secrets.R2_PUBLISH_ACCESS_KEY_ID }}
+          R2_PUBLISH_SECRET_ACCESS_KEY: ${{ secrets.R2_PUBLISH_SECRET_ACCESS_KEY }}
+        run: |
+          ./gradlew :jsyn:publishLibraryPublicationToSynausonRepository --no-daemon --console=plain \
+            "-Dorg.gradle.s3.endpoint=$R2_PUBLISH_ENDPOINT"
