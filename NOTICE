@@ -1,2 +1,5 @@
 jsyn
 Copyright 2024-2026 Synauson
+
+The models the engine downloads at runtime and the third-party code in the
+jsyn-natives jars are under their own licenses: see THIRD_PARTY_NOTICES.md.

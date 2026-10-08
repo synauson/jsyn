@@ -688,3 +688,6 @@ team, rely on CI, which runs the full suite on Linux and Windows for every push.
 ## License
 
 Apache 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+The models the engine downloads and the third-party code in the natives jars have their own
+licenses, listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
