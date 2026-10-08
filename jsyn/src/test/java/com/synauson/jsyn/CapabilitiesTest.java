@@ -17,7 +17,9 @@ class CapabilitiesTest {
         + "{\"code\":\"FEATURE_TURN_DETECTION\",\"entitled\":true,\"streams\":{\"limit\":4,\"inUse\":2}}],"
         + "\"models\":["
         + "{\"id\":\"sentito-1\",\"version\":\"5\",\"release\":\"5.0.0\",\"state\":\"ready\",\"detail\":null},"
-        + "{\"id\":\"fermata-1\",\"version\":\"1.0.0-cpu\",\"release\":\"1.0.0\",\"state\":\"missing\",\"detail\":\"not installed\"}]"
+        + "{\"id\":\"fermata-1\",\"version\":\"1.0.0-cpu\",\"release\":\"1.0.0\",\"state\":\"missing\",\"detail\":\"not installed\"}],"
+        + "\"stt\":{\"state\":\"calibrated\",\"workers\":3,\"threadsPerWorker\":5,"
+        + "\"realTimeFactor\":0.79,\"streams\":{\"limit\":3,\"inUse\":1},\"detail\":null}"
         + "}";
 
     @Test
@@ -40,5 +42,20 @@ class CapabilitiesTest {
         assertEquals("ready", c.models.get(0).state);
         assertEquals("missing", c.models.get(1).state);
         assertEquals("not installed", c.models.get(1).detail);
+
+        assertNotNull(c.stt);
+        assertEquals("calibrated", c.stt.state);
+        assertEquals(Integer.valueOf(3), c.stt.workers);
+        assertEquals(Integer.valueOf(5), c.stt.threadsPerWorker);
+        assertEquals(0.79, c.stt.realTimeFactor);
+        assertEquals(Integer.valueOf(3), c.stt.streams.limit);
+        assertEquals(1, c.stt.streams.inUse);
+        assertNull(c.stt.detail);
+    }
+
+    @Test
+    void nativesOlderThanSttReportNoCapacity() {
+        String older = JSON.substring(0, JSON.indexOf(",\"stt\"")) + "}";
+        assertNull(Capabilities.fromJson(older).stt);
     }
 }

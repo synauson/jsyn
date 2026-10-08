@@ -102,6 +102,30 @@ public final class JSynConfig {
      */
     public final @Nullable Integer webrtcIcePortMax;
 
+    /**
+     * STT decoding workers, each holding its own copy of the model. {@code null}:
+     * calibrated when the runtime starts (see {@link Capabilities#stt}).
+     *
+     * @since 1.6.0
+     */
+    public final @Nullable Integer sttWorkers;
+
+    /**
+     * ONNX Runtime threads per STT worker. {@code null}: calibrated.
+     *
+     * @since 1.6.0
+     */
+    public final @Nullable Integer sttThreads;
+
+    /**
+     * Concurrent STT streams this runtime admits, under the license's own STT limit;
+     * 0 turns STT off. {@code null}: what calibration finds the machine transcribes in
+     * real time.
+     *
+     * @since 1.6.0
+     */
+    public final @Nullable Integer maxSttStreams;
+
     private JSynConfig(Builder b) {
         this.modelStore = b.modelStore;
         this.licenseKey = b.licenseKey;
@@ -117,6 +141,9 @@ public final class JSynConfig {
         this.webrtcJitterBufferMs = b.webrtcJitterBufferMs;
         this.webrtcIcePortMin = b.webrtcIcePortMin;
         this.webrtcIcePortMax = b.webrtcIcePortMax;
+        this.sttWorkers = b.sttWorkers;
+        this.sttThreads = b.sttThreads;
+        this.maxSttStreams = b.maxSttStreams;
     }
 
     /**
@@ -159,6 +186,27 @@ public final class JSynConfig {
         private int webrtcJitterBufferMs = 200;
         private @Nullable Integer webrtcIcePortMin;
         private @Nullable Integer webrtcIcePortMax;
+        private @Nullable Integer sttWorkers;
+        private @Nullable Integer sttThreads;
+        private @Nullable Integer maxSttStreams;
+
+        /**
+         * Override the STT pool's calibrated shape and stream cap. Each {@code null}
+         * keeps the calibrated value; setting all three skips calibration.
+         *
+         * @param workers     decoding workers (at least 1), or {@code null}
+         * @param threads     ONNX Runtime threads per worker (at least 1), or {@code null}
+         * @param maxStreams  concurrent STT streams admitted (0 turns STT off), or {@code null}
+         * @return this builder
+         * @since 1.6.0
+         */
+        public Builder sttCapacity(@Nullable Integer workers, @Nullable Integer threads,
+                                   @Nullable Integer maxStreams) {
+            this.sttWorkers = workers;
+            this.sttThreads = threads;
+            this.maxSttStreams = maxStreams;
+            return this;
+        }
 
         /**
          * Set the model store the VAD and turn detection detectors load their models from.

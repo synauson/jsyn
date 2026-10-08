@@ -93,6 +93,15 @@ public final class WebRtcParticipantSpec {
     @SerializedName("turn_detection")
     public final @Nullable TurnDetectionConfig turnDetection;
 
+    /**
+     * Optional streaming speech-to-text; {@code null} disables it. Needs
+     * {@link #turnDetection} on the same participant: STT without it is refused with an
+     * {@link com.synauson.jsyn.exception.InvalidArgumentException}.
+     *
+     * @since 1.6.0
+     */
+    public final @Nullable SttConfig stt;
+
     private WebRtcParticipantSpec(Builder b) {
         this.participantId = Args.notNull(b.participantId, "participantId");
         this.sdpOffer = Args.notNull(b.sdpOffer, "sdpOffer");
@@ -110,6 +119,7 @@ public final class WebRtcParticipantSpec {
         this.opusPacketLossPercentage = b.opusPacketLossPercentage;
         this.vad = b.vad;
         this.turnDetection = b.turnDetection;
+        this.stt = b.stt;
     }
 
     /**
@@ -140,6 +150,7 @@ public final class WebRtcParticipantSpec {
         private @Nullable Integer opusPacketLossPercentage;
         private @Nullable VadConfig vad;
         private @Nullable TurnDetectionConfig turnDetection;
+        private @Nullable SttConfig stt;
 
         /**
          * Set the participant ID. Required.
@@ -276,6 +287,17 @@ public final class WebRtcParticipantSpec {
          * @return this builder
          */
         public Builder turnDetection(@Nullable TurnDetectionConfig st) { this.turnDetection = st; return this; }
+
+        /**
+         * Enable streaming speech-to-text on this participant's audio; read it with
+         * {@link com.synauson.jsyn.participant.Conference#streamTranscriptEvents}.
+         * Needs {@link #turnDetection}, whose turn ends close each turn's transcript.
+         *
+         * @param stt STT configuration, or {@code null} to disable
+         * @return this builder
+         * @since 1.6.0
+         */
+        public Builder stt(@Nullable SttConfig stt) { this.stt = stt; return this; }
 
         /**
          * Materialise an immutable {@link WebRtcParticipantSpec}.

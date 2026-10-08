@@ -304,6 +304,19 @@ public final class NativeBridge {
                                                         EventStreamObserver<?> listener);
 
     /**
+     * Subscribe to streaming STT events for a participant.
+     *
+     * @param handle   runtime handle
+     * @param confId   conference identifier
+     * @param pid      participant identifier
+     * @param listener observer receiving {@code TranscriptEvent} subtypes
+     * @return opaque subscription ID; pass to {@link #unsubscribe} to cancel
+     * @since 1.6.0
+     */
+    public static native long subscribeTranscriptEvents(long handle, String confId, String pid,
+                                                         EventStreamObserver<?> listener);
+
+    /**
      * Subscribe to file playback events for a participant.
      *
      * @param handle   runtime handle

@@ -39,6 +39,13 @@ public final class Capabilities {
     /** Each model this runtime knows, and whether it is ready to use. */
     public final List<ModelInfo> models;
 
+    /**
+     * This machine's STT capacity. {@code null} from natives older than STT.
+     *
+     * @since 1.6.0
+     */
+    public final @Nullable SttCapacity stt;
+
     private Capabilities() {
         this.license = null;
         this.limitsScope = null;
@@ -47,6 +54,7 @@ public final class Capabilities {
         this.aiConferences = null;
         this.capabilities = null;
         this.models = null;
+        this.stt = null;
     }
 
     /**
@@ -153,6 +161,42 @@ public final class Capabilities {
             this.version = null;
             this.release = null;
             this.state = null;
+            this.detail = null;
+        }
+    }
+
+    /**
+     * How many STT streams this machine transcribes in real time, and the pool that
+     * does it: calibrated when the runtime starts from a timed decode, or set with
+     * {@link JSynConfig.Builder#sttCapacity}. The license's {@code FEATURE_STT} stream
+     * limit applies on top.
+     *
+     * @since 1.6.0
+     */
+    public static final class SttCapacity {
+        /**
+         * {@code "calibrated"}, {@code "configured"}, {@code "calibrating"},
+         * {@code "failed"}, or {@code "not-calibrated"} (no licensed STT model yet; the
+         * first STT participant calibrates).
+         */
+        public final String state;
+        /** Decoding workers, once known. */
+        public final @Nullable Integer workers;
+        /** ONNX Runtime threads per worker, once known. */
+        public final @Nullable Integer threadsPerWorker;
+        /** One stream's decode time over audio time, when measured. */
+        public final @Nullable Double realTimeFactor;
+        /** The stream cap (once known) and the STT streams in use. */
+        public final Usage streams;
+        /** Why it is not calibrated, or failed. */
+        public final @Nullable String detail;
+
+        private SttCapacity() {
+            this.state = null;
+            this.workers = null;
+            this.threadsPerWorker = null;
+            this.realTimeFactor = null;
+            this.streams = null;
             this.detail = null;
         }
     }

@@ -8,6 +8,7 @@ import com.synauson.jsyn.event.DtmfEvent;
 import com.synauson.jsyn.event.FileEvent;
 import com.synauson.jsyn.event.IceCandidateEvent;
 import com.synauson.jsyn.event.TurnDetectionEvent;
+import com.synauson.jsyn.event.TranscriptEvent;
 import com.synauson.jsyn.event.VadEvent;
 import com.synauson.jsyn.internal.Args;
 import com.synauson.jsyn.internal.NativeBridge;
@@ -390,6 +391,33 @@ public final class Conference extends NativeResource {
         Args.notNull(observer, "observer");
         long subId = NativeBridge.subscribeTurnDetectionEvents(runtimeHandle, conferenceId,
                                                             participantId, (EventStreamObserver<?>) observer);
+        return new Subscription(subId);
+    }
+
+    /**
+     * Subscribe to a participant's streaming STT: committed text as it is decoded
+     * ({@link TranscriptEvent.Delta}) and each turn's text once turn detection completes the
+     * turn ({@link TranscriptEvent.Turn}). Events sent before the subscription are not
+     * replayed.
+     *
+     * @param participantId a participant added with an {@link com.synauson.jsyn.spec.SttConfig}
+     * @param observer      receives {@link TranscriptEvent} subtypes
+     * @return a {@link Subscription} that cancels the stream when {@link Subscription#close()} is called
+     * @throws com.synauson.jsyn.exception.NativeResourceClosedException if this conference is closed
+     * @throws com.synauson.jsyn.exception.InvalidArgumentException if
+     *         {@code participantId} or {@code observer} is null
+     * @throws com.synauson.jsyn.exception.FailedPreconditionException if the participant
+     *         has no STT
+     * @since 1.6.0
+     */
+    @SuppressWarnings("unchecked")
+    public Subscription streamTranscriptEvents(String participantId,
+                                                EventStreamObserver<TranscriptEvent> observer) {
+        requireOpen();
+        Args.notNull(participantId, "participantId");
+        Args.notNull(observer, "observer");
+        long subId = NativeBridge.subscribeTranscriptEvents(runtimeHandle, conferenceId,
+                                                             participantId, (EventStreamObserver<?>) observer);
         return new Subscription(subId);
     }
 

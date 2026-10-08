@@ -221,6 +221,17 @@ belongs to it. The same pattern works for turn detection, file, DTMF and ICE-can
 events. Each `stream*` call returns a `Subscription`. Observers run on
 an engine thread, so don't block in them; `onError` and `onCompleted` have defaults.
 
+Streaming speech-to-text works the same way: add `SttConfig` next to `TurnDetectionConfig`
+(STT without turn detection throws `InvalidArgumentException`) and read
+`conf.streamTranscriptEvents(id, observer)`. `TranscriptEvent.Delta` carries committed
+text as it is decoded, never revised. `TranscriptEvent.Turn` carries one turn's text
+when turn detection completes the turn; the turns' texts add up to the deltas' text, each
+word once. If transcription runs behind by more than `SttConfig.turnDrainMs` (default
+1000 ms), the turn arrives with `complete == false` and its late words open the next
+turn. STT needs `FEATURE_STT` in the license and an STT model, which the engine doesn't
+ship yet. `capabilities().stt` reports how many STT streams the machine transcribes in
+real time, measured at startup; `JSynConfig.Builder.sttCapacity` overrides it.
+
 Everything that owns native memory is `AutoCloseable`: `JSyn`, `Conference`, `Subscription` and
 `NativeParticipant`. Close them in reverse order of creation, which
 try-with-resources does for you. `close()` is idempotent, and a closed object throws
@@ -276,6 +287,7 @@ API.
 | Route audio between participants | [SipMixedSourcesE2eIT], [SipReserveConnectE2eIT] | `updatePartyAudioConnections`: growing the matrix mid-call, one destination mixing a native and a SIP source, and a two-way call as two one-way entries |
 | Voice activity detection | [VadDetectorIT], [RealVadE2eLatencyIT] | `VadConfig.defaults()`, a self-connection so audio reaches the detector, then `VadEvent.SpeechStart` |
 | End-of-turn detection | [TurnDetectionIT] | `TurnDetectionConfig` alongside VAD, then `TurnDetectionEvent.TurnResult` |
+| Streaming speech-to-text | [SttIT] | `SttConfig` needs `TurnDetectionConfig`, `streamTranscriptEvents` needs STT on the participant, and `capabilities().stt`. Transcripts themselves need an STT model the engine doesn't ship yet. |
 | Model store and missing models | [ModelStoreIT] | `JSyn.importModels` is idempotent and rejects corrupt files. A missing model throws `FailedPreconditionException` and leaves nothing half-built. |
 | Inbound SIP call | [SipParticipantIT], [SipMediaE2eIT] | `addSipParticipant`, `localRtpPort()` for your SDP, real RTP both ways, VAD on a SIP caller |
 | Outbound SIP call (reserve, then connect) | [SipReserveConnectE2eIT] | Reserve the ports for the offer, connect with the answer's `SipRemoteMedia`, SRTP keys across the two phases, and releasing a reservation |
@@ -300,6 +312,7 @@ their javadoc. `capabilities()` is covered by the licensing tour.
 [VadDetectorIT]: jsyn/src/test/java/com/synauson/jsyn/it/VadDetectorIT.java
 [RealVadE2eLatencyIT]: jsyn/src/test/java/com/synauson/jsyn/it/RealVadE2eLatencyIT.java
 [TurnDetectionIT]: jsyn/src/test/java/com/synauson/jsyn/it/TurnDetectionIT.java
+[SttIT]: jsyn/src/test/java/com/synauson/jsyn/it/SttIT.java
 [ModelStoreIT]: jsyn/src/test/java/com/synauson/jsyn/it/ModelStoreIT.java
 [SipParticipantIT]: jsyn/src/test/java/com/synauson/jsyn/it/SipParticipantIT.java
 [SipMediaE2eIT]: jsyn/src/test/java/com/synauson/jsyn/it/SipMediaE2eIT.java

@@ -70,8 +70,9 @@ tests the newest natives and the docs recommend them.
   `synauson-jni/src/exports/*.rs`. Change both sides together.
 - `synauson-jni/src/jni_cache.rs` looks up classes by fully qualified name and constructor
   signature: every `exception/*Exception`, `EventStreamObserver`, the event classes
-  (`VadEvent$SpeechStart`, `VadEvent$SpeechEnd`, `TurnDetectionEvent$TurnResult`, the
-  `FileEvent$*` subtypes, `DtmfEvent`, `IceCandidateEvent`) and
+  (`VadEvent$SpeechStart`, `VadEvent$SpeechEnd`, `TurnDetectionEvent$TurnResult`,
+  `TranscriptEvent$Delta`, `TranscriptEvent$Turn`, the `FileEvent$*` subtypes,
+  `DtmfEvent`, `IceCandidateEvent`) and
   `internal/NativeParticipantNativeHandle`. Renaming, moving, or changing a constructor
   compiles fine and then fails at run time: the exception classes are looked up when
   `new JSyn` starts the runtime, and the event classes when a stream is subscribed.

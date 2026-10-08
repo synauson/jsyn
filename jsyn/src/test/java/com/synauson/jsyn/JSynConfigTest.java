@@ -49,6 +49,19 @@ class JSynConfigTest {
     }
 
     @Test
+    void sttCapacityIsSentOnlyWhenSet() {
+        String json = JSynConfig.builder().sttCapacity(2, 4, 0).build().toJson();
+        assertTrue(json.contains("\"sttWorkers\":2"), json);
+        assertTrue(json.contains("\"sttThreads\":4"), json);
+        assertTrue(json.contains("\"maxSttStreams\":0"), json);
+        String partial = JSynConfig.builder().sttCapacity(null, null, 6).build().toJson();
+        assertFalse(partial.contains("sttWorkers"), partial);
+        assertTrue(partial.contains("\"maxSttStreams\":6"), partial);
+        String dflt = JSynConfig.builder().build().toJson();
+        assertFalse(dflt.contains("Stt"), "unset STT capacity is omitted: " + dflt);
+    }
+
+    @Test
     void webrtcIcePortRangeIsSentOnlyWhenSet() {
         String json = JSynConfig.builder().webrtcIcePortRange(40_000, 40_099).build().toJson();
         assertTrue(json.contains("\"webrtcIcePortMin\":40000"), json);
