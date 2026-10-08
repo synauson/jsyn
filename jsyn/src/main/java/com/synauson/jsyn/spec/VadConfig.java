@@ -9,7 +9,7 @@ import com.google.gson.annotations.SerializedName;
  * snake_case field names ({@code threshold}, {@code min_silence_ms},
  * {@code min_speech_ms}).
  *
- * <p>The underlying detector is the sentito-1 ONNX model; see
+ * <p>The underlying detector is the VAD ONNX model; see
  * {@link #defaults()} for production-recommended values.
  *
  * @since 0.1.0
@@ -40,7 +40,7 @@ public final class VadConfig {
     }
 
     /**
-     * Returns a VAD config with sensible defaults matching the sentito-1 model's
+     * Returns a VAD config with sensible defaults matching the VAD model's
      * recommended parameters ({@code threshold=0.5}, {@code minSilenceMs=300},
      * {@code minSpeechMs=250}).
      *

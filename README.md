@@ -224,7 +224,7 @@ connect a participant to itself.
 
 To run a detector, put `VadConfig` (voice activity) or `TurnDetectionConfig` (end of
 turn) on a participant's spec. The detectors form a chain, VAD, then turn detection, then
-STT, and each needs the one before it on the same participant: turn detection without
+STT, and each needs the one before it on the same participant: Turn detection without
 `VadConfig` throws `InvalidArgumentException` ("turn_detection needs vad on the same
 participant"), and nothing is added for you. Then subscribe with
 `conf.streamVadEvents(id, observer)` after adding the participant, since the detector
@@ -297,7 +297,7 @@ what it played (see [Speaking into the call](#speaking-into-the-call)).
 | `UtteranceDone` | `utteranceId`, `audioMs`, `atMs`, `underrunMs` | The utterance played to its end |
 | `UtteranceInterrupted` | `utteranceId`, `reason`, `heardText`, `heardTextEnd`, `heardMs` | It stopped early: `CANCELLED` (`cancelUtterance`), `PREEMPTED` (a new utterance started while it was preemptible) or `STREAM_ENDED` (the participant or conference went; before `StreamEnded`) |
 | `UtteranceFailed` | `utteranceId`, `code`, `message` | It failed: `TTS_UNAVAILABLE`, `SYNTHESIS_FAILED`, `UNSPEAKABLE_TEXT` (nothing to say, or a word too long for the model) or `TTS_CAPACITY` (the machine's TTS capacity was in use when it was to start) |
-| `Error` | `reason`, `message`, `metadata`, `turnId` | A recoverable problem; the stream goes on. `TURN_DETECTION_FAILED`: turn detection stopped, so only the timeout or `forceEndTurn` end turns from then on. `TURN_DECISION_MISSING`: a speech end got no turn detection decision within 2 s; the timeout still ends the turn. `STT_STOPPED`: STT failed, so turns end with the words they had, and later ones without words. `STT_LAGGING`: STT's backlog passed the STT drain budget (at least 500 ms; metadata `backlog_ms`, `threshold_ms`), so turns may end before their last words, which then open the next turn; sent again only after the backlog falls to half. |
+| `Error` | `reason`, `message`, `metadata`, `turnId` | A recoverable problem; the stream goes on. `TURN_DETECTION_FAILED`: Turn detection stopped, so only the timeout or `forceEndTurn` end turns from then on. `TURN_DECISION_MISSING`: a speech end got no turn-detection decision within 2 s; the timeout still ends the turn. `STT_STOPPED`: STT failed, so turns end with the words they had, and later ones without words. `STT_LAGGING`: STT's backlog passed the STT drain budget (at least 500 ms; metadata `backlog_ms`, `threshold_ms`), so turns may end before their last words, which then open the next turn; sent again only after the backlog falls to half. |
 | `StreamEnded` | `reason` | Last: the participant was removed or the conference terminated. `onCompleted` follows. |
 | `Unknown` | `type`, `json` | A kind from a newer engine. Ignore it, but it still has a seq. |
 
@@ -315,7 +315,7 @@ after a pause stays in the open turn unless turn detection's decision on the pau
 complete: then the turn ends at the pause and the new speech opens the next. A turn
 ends for one `reason`:
 
-- `MODEL`: turn detection's probability for a pause reached the end-of-turn threshold.
+- `MODEL`: Turn detection's probability for a pause reached the end-of-turn threshold.
 - `TIMEOUT`: the participant stayed silent for the end-of-turn timeout (default 5000 ms,
   0 turns it off) after a speech end, whatever turn detection said or whether it answered.
 - `MANUAL`: you called `conf.forceEndTurn(id)`.
@@ -655,9 +655,9 @@ start); each capability (`FEATURE_VAD`, `FEATURE_TURN_DETECTION`, `FEATURE_STT`,
 `FEATURE_TTS`, in that order) with `entitled` and `includedBy`; and the state of each
 model (`sentito-1`, `fermata-1`, `spartito-1`, `lettura-1`).
 
-The models the plan includes download into the model store in the background: sentito
-VAD and turn detection for `detect`; for `speech` also spartito-1 for STT (about 660 MB) and
-lettura-1 for TTS with its voices and pronunciation data (about 347 MB).
+The models the plan includes download into the model store in the background: the VAD
+and turn-detection models for `detect`; for `speech` also the STT model (about 660 MB) and
+the TTS model with its voices and pronunciation data (about 347 MB).
 Adding a detector before its model is ready throws `FailedPreconditionException` naming
 the model. On a host with no internet access, set `offline(true)` and a `licenseFile`, and
 fill the store from a folder of model files with `JSyn.importModels(from, store)`.

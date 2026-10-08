@@ -381,7 +381,7 @@ public final class Conference extends NativeResource {
     }
 
     /**
-     * Subscribe to turn detection events for a participant.
+     * Subscribe to turn-detection events for a participant.
      *
      * @param participantId the participant to subscribe for
      * @param observer      receives {@link TurnDetectionEvent.TurnResult}

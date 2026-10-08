@@ -25,8 +25,8 @@ public final class NativeParticipantSpec {
     public final @Nullable VadConfig vad;
 
     /**
-     * Optional TurnDetection configuration; {@code null} disables TurnDetection detection. Needs
-     * {@link #vad} on the same participant, whose speech ends it decides on: turn detection
+     * Optional turn-detection configuration; {@code null} disables turn detection. Needs
+     * {@link #vad} on the same participant, whose speech ends it decides on: Turn detection
      * without it is refused with an
      * {@link com.synauson.jsyn.exception.InvalidArgumentException}.
      */
@@ -97,10 +97,10 @@ public final class NativeParticipantSpec {
         public Builder vad(@Nullable VadConfig vad) { this.vad = vad; return this; }
 
         /**
-         * Enable TurnDetection detection on the participant's audio stream.
+         * Enable turn detection on the participant's audio stream.
          * Needs {@link #vad}, whose speech ends it decides on.
          *
-         * @param st TurnDetection configuration, or {@code null} to disable
+         * @param st turn-detection configuration, or {@code null} to disable
          * @return this builder
          */
         public Builder turnDetection(@Nullable TurnDetectionConfig st) { this.turnDetection = st; return this; }

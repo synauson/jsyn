@@ -58,7 +58,7 @@ jobs:
         run: ./gradlew :jsyn:compileJava :jsyn:compileTestJava :jsyn:checkReadmeSnippets --no-daemon --console=plain
 
   # -------------------------------------------------------------------------
-  # Run the full IT suite (VAD/TurnDetection model inference, SIP, WebRTC,
+  # Run the full IT suite (VAD and turn-detection model inference, SIP, WebRTC,
   # recording, DTMF, native-participant lifecycle) against the JNI boundary
   # on Linux. Checks out the sibling synauson repo for models/*.onnx and
   # the short_speech.wav fixture — jsyn itself ships neither.

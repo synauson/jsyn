@@ -39,7 +39,7 @@ class VadDetectorIT {
         String confId = "vad-it-" + ts;
         String pid = "vad-p-" + ts;
 
-        // VAD requires actual speech audio — a pure sine wave won't trigger sentito-1.
+        // VAD requires actual speech audio — a pure sine wave won't trigger VAD.
         // Use the short_speech.wav fixture. Skip if neither fixture nor models are present.
         Path speechWav = JSynTestHelpers.resolveSynausonRepo()
                 .resolve("synauson-server/tests/fixtures/short_speech.wav");

@@ -292,7 +292,7 @@ public final class NativeBridge {
                                                   EventStreamObserver<?> listener);
 
     /**
-     * Subscribe to turn detection events for a participant.
+     * Subscribe to turn-detection events for a participant.
      *
      * @param handle   runtime handle
      * @param confId   conference identifier

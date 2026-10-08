@@ -282,7 +282,7 @@ public final class Capabilities {
         public final @Nullable String file;
         /** Whether this start ignored the cached timings ({@link JSynConfig.Builder#recalibrate}). */
         public final boolean recalibrate;
-        /** One sentito-1 chunk (32 ms of audio); {@code null} until timed. */
+        /** One VAD chunk (32 ms of audio); {@code null} until timed. */
         public final @Nullable DetectorTiming vad;
         /** One turn detection decision; {@code null} until timed. */
         public final @Nullable DetectorTiming turnDetection;

@@ -98,7 +98,7 @@ class AgentTurnsIT {
                 spec(TurnDetectionConfig.defaults().withTurns(
                     TurnConfigUpdate.none().withEndOfTurnTimeoutMs(70_000)))));
 
-            // Only the agent ends turns here: turn detection never reaches 1.0, no timeout.
+            // Only the agent ends turns here: Turn detection never reaches 1.0, no timeout.
             NativeParticipant p = conf.addNativeParticipant(pid, spec(
                 new TurnDetectionConfig(16_000, 0.5f).withTurns(TurnConfigUpdate.none()
                     .withEndOfTurnThreshold(1.0f).withEndOfTurnTimeoutMs(0))));

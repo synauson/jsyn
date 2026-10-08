@@ -23,12 +23,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Task 1.7.7 — TurnDetection detector emits a TurnResult event after enough speech audio.
+ * Task 1.7.7 — the turn detector emits a TurnResult event after enough speech audio.
  *
- * <p>TurnDetection inference is triggered by VAD speech-end events (see
- * {@code synauson-core/src/detectors/turn_detection.rs}). Both VAD and TurnDetection
+ * <p>Turn-detection inference is triggered by VAD speech-end events (see
+ * {@code synauson-core/src/detectors/turn_detection.rs}). Both VAD and turn detection
  * must be configured on the participant, and real speech audio is required to
- * trigger the VAD → TurnDetection chain.
+ * trigger the VAD then turn-detection chain.
  *
  * <p>Uses the short_speech.wav fixture. Skips if the fixture or model files are absent.
  */
@@ -59,7 +59,7 @@ class TurnDetectionIT {
 
     @Test
     void turnResultEventArrivesAfterEnoughAudio() throws Exception {
-        // TurnDetection requires real speech (VAD fires first), and both model files.
+        // Turn detection requires real speech (VAD fires first), and both model files.
         java.nio.file.Path speechWav = JSynTestHelpers.resolveSynausonRepo()
                 .resolve("synauson-server/tests/fixtures/short_speech.wav");
         Assumptions.assumeTrue(speechWav.toFile().exists(),
@@ -81,7 +81,7 @@ class TurnDetectionIT {
              NativeParticipant p = conf.addNativeParticipant(pid,
                      NativeParticipantSpec.builder()
                              .format(fmt)
-                             // VAD must be enabled — TurnDetection fires on VAD speech-end.
+                             // VAD must be enabled — turn detection fires on VAD speech-end.
                              .vad(new VadConfig(0.3f, 100, 100))
                              .turnDetection(new TurnDetectionConfig(16_000, 0.5f))
                              .build())) {
