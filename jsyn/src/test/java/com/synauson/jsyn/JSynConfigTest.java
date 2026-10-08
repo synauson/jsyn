@@ -62,6 +62,16 @@ class JSynConfigTest {
     }
 
     @Test
+    void sttTurnFlushIsSentOnlyWhenSet() {
+        String on = JSynConfig.builder().sttTurnFlush(true).build().toJson();
+        assertTrue(on.contains("\"sttTurnFlush\":true"), on);
+        String off = JSynConfig.builder().sttTurnFlush(false).build().toJson();
+        assertTrue(off.contains("\"sttTurnFlush\":false"), off);
+        String dflt = JSynConfig.builder().sttTurnFlush(true).sttTurnFlush(null).build().toJson();
+        assertFalse(dflt.contains("sttTurnFlush"), "unset takes the engine default: " + dflt);
+    }
+
+    @Test
     void webrtcIcePortRangeIsSentOnlyWhenSet() {
         String json = JSynConfig.builder().webrtcIcePortRange(40_000, 40_099).build().toJson();
         assertTrue(json.contains("\"webrtcIcePortMin\":40000"), json);

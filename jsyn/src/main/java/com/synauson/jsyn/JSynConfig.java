@@ -126,6 +126,14 @@ public final class JSynConfig {
      */
     public final @Nullable Integer maxSttStreams;
 
+    /**
+     * Close turns early on forecasts of their last words. {@code null}: the engine
+     * default, off. See {@link Builder#sttTurnFlush}.
+     *
+     * @since 1.6.0
+     */
+    public final @Nullable Boolean sttTurnFlush;
+
     private JSynConfig(Builder b) {
         this.modelStore = b.modelStore;
         this.licenseKey = b.licenseKey;
@@ -144,6 +152,7 @@ public final class JSynConfig {
         this.sttWorkers = b.sttWorkers;
         this.sttThreads = b.sttThreads;
         this.maxSttStreams = b.maxSttStreams;
+        this.sttTurnFlush = b.sttTurnFlush;
     }
 
     /**
@@ -189,6 +198,7 @@ public final class JSynConfig {
         private @Nullable Integer sttWorkers;
         private @Nullable Integer sttThreads;
         private @Nullable Integer maxSttStreams;
+        private @Nullable Boolean sttTurnFlush;
 
         /**
          * Override the STT pool's calibrated shape and stream cap. Each {@code null}
@@ -205,6 +215,29 @@ public final class JSynConfig {
             this.sttWorkers = workers;
             this.sttThreads = threads;
             this.maxSttStreams = maxStreams;
+            return this;
+        }
+
+        /**
+         * Close each turn's transcript as soon as turn detection ends the turn. Default: off.
+         *
+         * <p>When on, and turn detection ends a turn whose text hasn't settled, the engine
+         * decodes a forecast of the turn's last words ahead of real time and sends the
+         * {@link com.synauson.jsyn.event.TranscriptEvent.Turn} on it, instead of waiting
+         * for the call's own audio to get there. Measured on a Ryzen 7 3700X, it
+         * closed long turns about 130 ms sooner for about 26% more CPU. Calibration sets
+         * decoding aside for the forecasts, which lowers the STT stream cap by about a
+         * quarter; {@link Capabilities.SttCapacity#turnFlush} and
+         * {@link Capabilities.SttCapacity#forecastReserve} report it. Natives without the
+         * option ignore it.
+         *
+         * @param on {@code true} to close turns on forecasts, {@code false} to wait for
+         *        the transcription, or {@code null} for the engine default (off)
+         * @return this builder
+         * @since 1.6.0
+         */
+        public Builder sttTurnFlush(@Nullable Boolean on) {
+            this.sttTurnFlush = on;
             return this;
         }
 

@@ -198,6 +198,18 @@ public final class Capabilities {
         public final Usage streams;
         /** Why it is idle, or failed. */
         public final @Nullable String detail;
+        /**
+         * Whether turns close early on forecasts (see
+         * {@link JSynConfig.Builder#sttTurnFlush}). {@code null} from natives without
+         * the turn flush.
+         */
+        public final @Nullable Boolean turnFlush;
+        /**
+         * Decoding the stream cap sets aside per stream for the turn flush's forecasts,
+         * as a share of the stream's own: 0 when the flush is off. {@code null} when the
+         * capacity wasn't measured, or from natives without the turn flush.
+         */
+        public final @Nullable Double forecastReserve;
 
         private SttCapacity() {
             this.state = null;
@@ -209,6 +221,8 @@ public final class Capabilities {
             this.limitedBy = null;
             this.streams = null;
             this.detail = null;
+            this.turnFlush = null;
+            this.forecastReserve = null;
         }
     }
 }

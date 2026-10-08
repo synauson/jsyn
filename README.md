@@ -230,11 +230,15 @@ word once, except that a turn never starts with punctuation (the period ending t
 sentence before, which the model commits with the next word), so turns may end without
 one. If the turn's text hasn't settled within `SttConfig.turnDrainMs` (default
 1000 ms), the turn arrives with `complete == false` and its late words open the next
-turn. STT needs `FEATURE_STT` in the license. Its decoding pool loads in the background
-when the runtime starts; until `capabilities().stt.state` is `ready`, adding a
-participant with STT throws `FailedPreconditionException`. `capabilities().stt` also
-reports how many STT streams the machine transcribes in real time, as measured;
-`JSynConfig.Builder.sttCapacity` overrides it.
+turn. `JSynConfig.Builder.sttTurnFlush(true)` closes such turns sooner, on a forecast of
+their last words. A turn can then arrive before the deltas of its last words, and when
+the speaker kept talking and the transcript changed, the next turn may repeat a word
+(see the `TranscriptEvent.Turn` javadoc). STT needs `FEATURE_STT` in the license. Its
+decoding pool loads in the background when the runtime starts; until
+`capabilities().stt.state` is `ready`, adding a participant with STT throws
+`FailedPreconditionException`. `capabilities().stt` also reports how many STT streams
+the machine transcribes in real time, as measured; `JSynConfig.Builder.sttCapacity`
+overrides it.
 
 Everything that owns native memory is `AutoCloseable`: `JSyn`, `Conference`, `Subscription` and
 `NativeParticipant`. Close them in reverse order of creation, which
@@ -344,7 +348,14 @@ The tests show one feature at a time. For whole applications you can run and ada
 ## Configuration and logging
 
 Set runtime options on `JSynConfig.builder()`; its javadoc lists every option with its
-default. The engine also reads these environment variables:
+default. The STT options:
+
+| Option | Default | Effect |
+|---|---|---|
+| `sttCapacity(workers, threads, maxStreams)` | measured at startup | The STT pool's workers, ONNX Runtime threads per worker, and stream cap; `maxStreams` 0 turns STT off. Each `null` keeps the measured value. |
+| `sttTurnFlush(Boolean)` | off | Close each turn's transcript on a forecast of its last words as soon as turn detection ends the turn, rather than waiting for the transcription to get there. On a Ryzen 7 3700X it closed long turns about 130 ms sooner for about 26% more CPU, and the decoding it sets aside lowers the STT stream cap by about a quarter. `capabilities().stt.turnFlush` and `forecastReserve` report it. Natives that predate it ignore it. |
+
+The engine also reads these environment variables:
 
 | Variable | Effect |
 |---|---|

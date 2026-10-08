@@ -20,7 +20,8 @@ class CapabilitiesTest {
         + "{\"id\":\"fermata-1\",\"version\":\"1.0.0-cpu\",\"release\":\"1.0.0\",\"state\":\"missing\",\"detail\":\"not installed\"}],"
         + "\"stt\":{\"state\":\"ready\",\"calibrated\":true,\"workers\":3,\"threadsPerWorker\":5,"
         + "\"realTimeFactor\":0.79,\"modelBytes\":1189294080,\"limitedBy\":\"cpu\","
-        + "\"streams\":{\"limit\":3,\"inUse\":1},\"detail\":null}"
+        + "\"streams\":{\"limit\":3,\"inUse\":1},\"detail\":null,"
+        + "\"turnFlush\":true,\"forecastReserve\":0.384}"
         + "}";
 
     @Test
@@ -55,6 +56,17 @@ class CapabilitiesTest {
         assertEquals(Integer.valueOf(3), c.stt.streams.limit);
         assertEquals(1, c.stt.streams.inUse);
         assertNull(c.stt.detail);
+        assertEquals(Boolean.TRUE, c.stt.turnFlush);
+        assertEquals(Double.valueOf(0.384), c.stt.forecastReserve);
+    }
+
+    @Test
+    void nativesOlderThanTheTurnFlushReportNeither() {
+        String older = JSON.replace(",\"turnFlush\":true,\"forecastReserve\":0.384", "");
+        Capabilities c = Capabilities.fromJson(older);
+        assertNotNull(c.stt);
+        assertNull(c.stt.turnFlush);
+        assertNull(c.stt.forecastReserve);
     }
 
     @Test

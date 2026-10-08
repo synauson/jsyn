@@ -86,7 +86,8 @@ public abstract class TranscriptEvent {
     }
 
     /**
-     * One turn's text, sent after the deltas it covers.
+     * One turn's text, sent after the deltas it covers (except a turn the turn flush
+     * closes; see below).
      *
      * <p>The model commits a word some time after it is spoken, so the engine cuts a
      * turn where the speech is: its text is the committed text up to where the next
@@ -97,6 +98,14 @@ public abstract class TranscriptEvent {
      * without a period. Otherwise the turns' texts, in order, are the deltas' texts: no
      * word is lost or repeated. A turn that runs out of time has {@link #complete}
      * false, and its late words open the next turn.
+     *
+     * <p>With {@link com.synauson.jsyn.JSynConfig.Builder#sttTurnFlush} on, a turn whose
+     * text hasn't settled closes on a forecast of its last words instead of waiting.
+     * Such a turn is complete and can arrive before the deltas of its last words. When
+     * the transcription later commits other words in place of the forecast ones (the
+     * speaker went on talking), the turn keeps its forecast text, the deltas carry what
+     * was committed, and those words open the next turn, which may then start with a
+     * word this turn ended with.
      *
      * <p>JNI constructor:
      * {@code (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JJJFZ)V}.
