@@ -1,0 +1,338 @@
+name: ci
+
+# Pull requests are disabled on this repository. Every branch push runs CI, and
+# main only moves to a commit whose checks passed (enforced by a ruleset).
+on:
+  push:
+    branches: ['**']
+  workflow_dispatch:
+
+jobs:
+  # -------------------------------------------------------------------------
+  # Compile pure-Java sources to catch API regressions without needing the
+  # native platform JARs. Test compilation needs jsyn-natives-linux on the
+  # test classpath; it resolves from the public Synauson Maven repository.
+  # -------------------------------------------------------------------------
+  java-compile:
+    runs-on: [self-hosted, Linux, X64, synauson]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Temurin 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
+
+      - name: Cache Gradle wrapper + caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', 'gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: compile jsyn sources and tests
+        run: ./gradlew :jsyn:compileJava :jsyn:compileTestJava --no-daemon --console=plain
+
+  # -------------------------------------------------------------------------
+  # Run the full IT suite (VAD/TurnDetection model inference, SIP, WebRTC,
+  # recording, DTMF, native-participant lifecycle) against the JNI boundary
+  # on Linux. Checks out the sibling synauson repo for models/*.onnx and
+  # the short_speech.wav fixture — jsyn itself ships neither.
+  # -------------------------------------------------------------------------
+  test-linux:
+    runs-on: [self-hosted, Linux, X64, synauson]
+    needs: java-compile
+    timeout-minutes: 30
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.playwright-browsers
+      PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      # synauson/synauson is private: synauson[bot] mints a short-lived token that
+      # can only read it.
+      - name: Mint a read-only token for synauson/synauson
+        id: synauson-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.SYNAUSON_APP_ID }}
+          private-key: ${{ secrets.SYNAUSON_APP_PRIVATE_KEY }}
+          owner: synauson
+          repositories: synauson
+          permission-contents: read
+
+      - name: Checkout synauson (models + fixtures)
+        uses: actions/checkout@v4
+        with:
+          repository: synauson/synauson
+          token: ${{ steps.synauson-token.outputs.token }}
+          path: synauson-repo
+
+      - name: Install GStreamer runtime packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libgstreamer1.0-0 \
+            gstreamer1.0-plugins-base \
+            gstreamer1.0-plugins-good \
+            gstreamer1.0-plugins-bad \
+            gstreamer1.0-plugins-ugly \
+            gstreamer1.0-libav \
+            gstreamer1.0-nice
+
+      - name: Install ONNX Runtime 1.24.4
+        # Idempotent: /opt can persist between jobs on a self-hosted runner,
+        # so a second run must not mv/ln over what the first installed.
+        run: |
+          if [ ! -d /opt/onnxruntime ]; then
+            curl -L -o /tmp/ort.tgz \
+              "https://github.com/microsoft/onnxruntime/releases/download/v1.24.4/onnxruntime-linux-x64-1.24.4.tgz"
+            sudo mkdir -p /opt
+            sudo tar -xzf /tmp/ort.tgz -C /opt/
+            sudo mv /opt/onnxruntime-linux-x64-1.24.4 /opt/onnxruntime
+          fi
+          sudo ln -sf /opt/onnxruntime/lib/libonnxruntime.so.1.24.4 /usr/lib/libonnxruntime.so
+
+      - name: Cache Playwright Chromium
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.PLAYWRIGHT_BROWSERS_PATH }}
+          key: ${{ runner.os }}-playwright-chromium-1.47.0
+
+      - name: Set up Temurin 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
+
+      - name: Cache Gradle wrapper + caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-test-${{ hashFiles('**/*.gradle*', 'gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-test-
+
+      - name: Install Playwright Chromium
+        env:
+          INSTALL_PLAYWRIGHT_DEPS: "1"
+        run: ./gradlew :jsyn:installPlaywrightBrowsers --no-daemon --console=plain
+
+      - name: gradle :jsyn:test
+        env:
+          # The natives need a license key: a test license with every capability.
+          SYNAUSON_LICENSE_KEY: ${{ secrets.SYNAUSON_LICENSE_KEY }}
+        run: |
+          ./gradlew :jsyn:test --no-daemon --console=plain \
+            -DsynausonRepoDir="${{ github.workspace }}/synauson-repo"
+
+      # Artifacts are awkward to fetch from automation; put the failing
+      # classes' JUnit XML (stack traces, suppressed exceptions, captured
+      # stdout/stderr) straight into the job log.
+      - name: Print failing test reports
+        if: failure()
+        run: grep -l -E '<(failure|error) ' jsyn/build/test-results/test/*.xml | xargs -r cat
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-linux
+          path: |
+            jsyn/build/test-results/test/*.xml
+            jsyn/build/reports/tests/test/
+          retention-days: 14
+
+  # -------------------------------------------------------------------------
+  # Same IT suite as test-linux, on Windows. Uses only the GStreamer runtime
+  # MSI (not the devel MSI) — jsyn doesn't compile anything, it only needs
+  # the runtime to exist so the pre-built native library can load.
+  # -------------------------------------------------------------------------
+  test-windows:
+    runs-on: [self-hosted, Windows, X64, synauson]
+    needs: java-compile
+    timeout-minutes: 45
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.playwright-browsers
+    steps:
+      - uses: actions/checkout@v4
+
+      # synauson/synauson is private: synauson[bot] mints a short-lived token that
+      # can only read it.
+      - name: Mint a read-only token for synauson/synauson
+        id: synauson-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.SYNAUSON_APP_ID }}
+          private-key: ${{ secrets.SYNAUSON_APP_PRIVATE_KEY }}
+          owner: synauson
+          repositories: synauson
+          permission-contents: read
+
+      - name: Checkout synauson (models + fixtures)
+        uses: actions/checkout@v4
+        with:
+          repository: synauson/synauson
+          token: ${{ steps.synauson-token.outputs.token }}
+          path: synauson-repo
+
+      - name: Cache GStreamer + ORT installer downloads
+        id: cache-deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/gst-runtime.msi
+            ~/onnxruntime-win-x64.zip
+          key: win-test-deps-gst-1.26.7-ort-1.24.4-v1
+
+      - name: Download GStreamer runtime MSI (cache miss only)
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          Invoke-WebRequest `
+            -Uri "https://gstreamer.freedesktop.org/data/pkg/windows/1.26.7/msvc/gstreamer-1.0-msvc-x86_64-1.26.7.msi" `
+            -OutFile (Join-Path $HOME 'gst-runtime.msi')
+
+      - name: Install GStreamer runtime (system-wide, silent)
+        shell: pwsh
+        run: |
+          if (Test-Path 'C:\gstreamer\1.0\msvc_x86_64\bin\gstreamer-1.0-0.dll') {
+            Write-Host "GStreamer already installed, skipping."
+          } else {
+            $msi = Join-Path $HOME 'gst-runtime.msi'
+            $proc = Start-Process msiexec.exe -Wait -PassThru -ArgumentList @(
+              '/i', $msi, '/quiet', '/norestart', 'ADDLOCAL=ALL', 'INSTALLDIR=C:\gstreamer\')
+            if ($proc.ExitCode -ne 0) { throw "msiexec failed with exit code $($proc.ExitCode)" }
+          }
+          "C:\gstreamer\1.0\msvc_x86_64\bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+
+      # The first gst_init() for a user scans every installed plugin through
+      # gst-plugin-scanner and caches the result under %LOCALAPPDATA%\gstreamer-1.0
+      # (ensure_current_registry in gstreamer/gst/gstregistry.c). On a fresh
+      # runner that takes 7-44 s (DirectShow, Media Foundation and D3D11
+      # plugins probe devices at load), and without this step it lands inside
+      # whichever IT constructs JSyn first and blows its @Timeout.
+      - name: Build GStreamer plugin registry
+        shell: pwsh
+        run: |
+          $sw = [Diagnostics.Stopwatch]::StartNew()
+          gst-inspect-1.0.exe coreelements | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "gst-inspect-1.0 failed: $LASTEXITCODE" }
+          Write-Host "GStreamer registry built in $($sw.Elapsed.TotalSeconds) s"
+
+      - name: Download + extract ONNX Runtime (cache miss only)
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          Invoke-WebRequest `
+            -Uri "https://github.com/microsoft/onnxruntime/releases/download/v1.24.4/onnxruntime-win-x64-1.24.4.zip" `
+            -OutFile "$HOME/onnxruntime-win-x64.zip"
+
+      - name: Extract ONNX Runtime
+        shell: pwsh
+        run: |
+          if (Test-Path 'C:\ort\onnxruntime-win-x64-1.24.4') {
+            Write-Host "ORT already extracted, skipping."
+          } else {
+            New-Item -ItemType Directory -Force -Path C:\ort | Out-Null
+            Expand-Archive -Path "$HOME/onnxruntime-win-x64.zip" -DestinationPath C:\ort -Force
+          }
+          "C:\ort\onnxruntime-win-x64-1.24.4\lib" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+
+      - name: Cache Playwright Chromium
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.PLAYWRIGHT_BROWSERS_PATH }}
+          key: ${{ runner.os }}-playwright-chromium-1.47.0
+
+      - name: Set up Temurin 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
+
+      - name: Cache Gradle wrapper + caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-test-${{ hashFiles('**/*.gradle*', 'gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-test-
+
+      - name: Install Playwright Chromium
+        shell: pwsh
+        run: ./gradlew.bat :jsyn:installPlaywrightBrowsers --no-daemon --console=plain
+
+      - name: gradle :jsyn:test
+        env:
+          # The natives need a license key: a test license with every capability.
+          SYNAUSON_LICENSE_KEY: ${{ secrets.SYNAUSON_LICENSE_KEY }}
+        shell: pwsh
+        run: |
+          ./gradlew.bat :jsyn:test --no-daemon --console=plain `
+            "-DsynausonRepoDir=${{ github.workspace }}\synauson-repo"
+
+      # See the matching step in test-linux.
+      - name: Print failing test reports
+        if: failure()
+        shell: pwsh
+        run: |
+          Get-ChildItem jsyn/build/test-results/test/*.xml |
+            Where-Object { Select-String -Path $_ -Pattern '<(failure|error) ' -Quiet } |
+            ForEach-Object { Get-Content $_ }
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-windows
+          path: |
+            jsyn/build/test-results/test/*.xml
+            jsyn/build/reports/tests/test/
+          retention-days: 14
+
+  # -------------------------------------------------------------------------
+  # Publish com.synauson:jsyn:1.0.0-SNAPSHOT to the Synauson Maven repository
+  # on every push to main.
+  # This gives the examples testbed a stable, always-current snapshot to pull
+  # without coordinating timestamp-based version strings across repos.
+  # PRs do not publish.
+  # -------------------------------------------------------------------------
+  publish-snapshot:
+    runs-on: [self-hosted, Linux, X64, synauson]
+    needs: [java-compile, test-linux, test-windows]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Temurin 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
+
+      - name: Cache Gradle wrapper + caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-snapshot-${{ hashFiles('**/*.gradle*', 'gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-snapshot-
+
+      - name: publish jsyn snapshot
+        env:
+          JSYN_VERSION: 1.0.0-SNAPSHOT
+          MAVEN_SNAPSHOTS_URL: ${{ secrets.MAVEN_SNAPSHOTS_URL }}
+          MAVEN_USER: ${{ secrets.MAVEN_USER }}
+          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+        run: ./gradlew :jsyn:publishLibraryPublicationToSynausonRepository --no-daemon --console=plain
