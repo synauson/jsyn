@@ -63,6 +63,23 @@ jobs:
           ssh-key: ${{ secrets.SYNAUSON_DEPLOY_KEY }}
           path: synauson-repo
 
+      # synauson's model files live in a private bucket, and synauson ships a
+      # dependency-free script to fetch them. A synauson that still keeps the
+      # models in git has no script, and this step does nothing there.
+      - name: Fetch models into the synauson checkout
+        shell: bash
+        env:
+          SYNAUSON_MODELS_ACCESS_KEY_ID: ${{ secrets.SYNAUSON_MODELS_ACCESS_KEY_ID }}
+          SYNAUSON_MODELS_SECRET_ACCESS_KEY: ${{ secrets.SYNAUSON_MODELS_SECRET_ACCESS_KEY }}
+        run: |
+          script=synauson-repo/tools/models-fetch/fetch-models.sh
+          echo "curl: $(command -v curl), $(curl --version | sed -n 1p)"
+          if [ ! -f "$script" ]; then
+            echo "no $script in this synauson checkout; models come from git"
+            exit 0
+          fi
+          sh "$script" synauson-repo/models
+
       - name: Install GStreamer runtime packages
         run: |
           sudo apt-get update
@@ -161,6 +178,23 @@ jobs:
           # synauson/synauson is private; this deploy key can only read it.
           ssh-key: ${{ secrets.SYNAUSON_DEPLOY_KEY }}
           path: synauson-repo
+
+      # synauson's model files live in a private bucket, and synauson ships a
+      # dependency-free script to fetch them. A synauson that still keeps the
+      # models in git has no script, and this step does nothing there.
+      - name: Fetch models into the synauson checkout
+        shell: bash
+        env:
+          SYNAUSON_MODELS_ACCESS_KEY_ID: ${{ secrets.SYNAUSON_MODELS_ACCESS_KEY_ID }}
+          SYNAUSON_MODELS_SECRET_ACCESS_KEY: ${{ secrets.SYNAUSON_MODELS_SECRET_ACCESS_KEY }}
+        run: |
+          script=synauson-repo/tools/models-fetch/fetch-models.sh
+          echo "curl: $(command -v curl), $(curl --version | sed -n 1p)"
+          if [ ! -f "$script" ]; then
+            echo "no $script in this synauson checkout; models come from git"
+            exit 0
+          fi
+          sh "$script" synauson-repo/models
 
       - name: Cache GStreamer + ORT installer downloads
         id: cache-deps
