@@ -49,8 +49,9 @@ public final class JSynConfig {
     public final @Nullable String licenseFile;
 
     /**
-     * Directory for state that must survive restarts, such as the cached license
-     * file. {@code null} selects {@code $SYNAUSON_STATE_DIR} if set, else the per-user
+     * Directory for state that must survive restarts: the cached license file, and the
+     * calibration cache ({@code calibration.json}, see {@link Builder#recalibrate}).
+     * {@code null} selects {@code $SYNAUSON_STATE_DIR} if set, else the per-user
      * state directory ({@code %LOCALAPPDATA%\synauson\state} on Windows,
      * {@code $XDG_STATE_HOME/synauson} or {@code ~/.local/state/synauson} on Linux).
      *
@@ -65,6 +66,14 @@ public final class JSynConfig {
      * @since 1.4.0
      */
     public final boolean offline;
+
+    /**
+     * Time the models again at startup instead of reusing the timings cached in
+     * {@link #stateDir}. See {@link Builder#recalibrate}.
+     *
+     * @since 1.6.0
+     */
+    public final boolean recalibrate;
 
     /** Maximum concurrent conferences. {@code null} = unlimited. */
     public final @Nullable Integer maxConferences;
@@ -155,6 +164,7 @@ public final class JSynConfig {
         this.licenseFile = b.licenseFile;
         this.stateDir = b.stateDir;
         this.offline = b.offline;
+        this.recalibrate = b.recalibrate;
         this.maxConferences = b.maxConferences;
         this.maxParticipantsPerConference = b.maxParticipantsPerConference;
         this.rtpPortMin = b.rtpPortMin;
@@ -203,6 +213,7 @@ public final class JSynConfig {
         private @Nullable String licenseFile;
         private @Nullable String stateDir;
         private boolean offline;
+        private boolean recalibrate;
         private @Nullable Integer maxConferences;
         private @Nullable Integer maxParticipantsPerConference;
         private int rtpPortMin = 10000;
@@ -355,6 +366,28 @@ public final class JSynConfig {
          */
         public Builder offline(boolean offline) {
             this.offline = offline;
+            return this;
+        }
+
+        /**
+         * Ignore the model timings cached in the state directory, time the models again
+         * and replace them. Default: {@code false}.
+         *
+         * <p>At startup the engine times the STT model, one VAD chunk and one turn detection
+         * decision, and sizes its pools from those timings. It keeps them in
+         * {@code calibration.json} in the {@linkplain #stateDir state directory}, and a
+         * later start reuses them instead of timing again. A cached timing is reused only
+         * on the same model, CPU, CPU budget, thread count and ONNX Runtime version;
+         * anything else is timed again on its own. Set this after changing hardware in
+         * place, or to take fresh timings on an idle host. Natives without the cache
+         * ignore it.
+         *
+         * @param recalibrate whether to ignore the cached timings
+         * @return this builder
+         * @since 1.6.0
+         */
+        public Builder recalibrate(boolean recalibrate) {
+            this.recalibrate = recalibrate;
             return this;
         }
 

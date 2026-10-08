@@ -233,6 +233,19 @@ itself from the runtime's CPU budget, a container's or service's CPU quota and c
 rather than the host's CPU count (`capabilities().resources`); `cpuBudget` and
 `memoryBudget` set it by hand.
 
+The engine also times one VAD chunk and one turn detection decision in the background at
+startup. It keeps every timing in `calibration.json` in the state directory
+(`JSynConfig.Builder.stateDir`), and a later start reuses a timing instead of measuring
+again when the model, the CPU and its features, the CPU budget, the thread count and the
+ONNX Runtime version all match. Anything else is measured again and replaces the entry.
+A timing taken while the CPU was busy (Linux, from the kernel's pressure figures) is used
+for that run but not cached. `capabilities().stt.source` says whether STT's numbers were
+measured on this start (`auto`), read from the cache (`cached`) or set with
+`sttCapacity` (`override`), and `capabilities().calibration` gives the cache file and
+the detector timings. After changing hardware in place, or to measure again on an idle
+host, start once with `recalibrate(true)`. Runtimes that share a state directory share
+the file, and the last one to write it wins.
+
 ## NVIDIA GPUs
 
 The engine runs all inference on the CPU, through ONNX Runtime's CPU execution provider.

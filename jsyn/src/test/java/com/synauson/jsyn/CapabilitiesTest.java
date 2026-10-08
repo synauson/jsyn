@@ -20,14 +20,17 @@ class CapabilitiesTest {
         + "\"stt\":{\"state\":\"ready\",\"calibrated\":true,\"workers\":3,\"threadsPerWorker\":5,"
         + "\"realTimeFactor\":0.79,\"modelBytes\":1189294080,\"limitedBy\":\"cpu\","
         + "\"streams\":{\"limit\":3,\"inUse\":1},\"detail\":null,"
-        + "\"turnFlush\":true,\"forecastReserve\":0.384},"
+        + "\"turnFlush\":true,\"forecastReserve\":0.384,\"source\":\"cached\"},"
         + "\"sessions\":{\"limit\":20,\"inUse\":17,\"ceiling\":25,\"level\":\"near-limit\","
         + "\"peak\":19,\"peakAt\":\"2026-10-04T09:12:00+00:00\"},"
         + "\"resources\":{\"cpuBudget\":1.5,\"cpuSource\":\"auto\",\"limitedBy\":\"cpu_max\","
         + "\"cores\":1,\"logicalCpus\":8,\"physicalCores\":4,\"performanceCpus\":null,"
         + "\"cpuModel\":\"Intel(R) Xeon(R) Platinum 8481C CPU @ 2.70GHz\","
         + "\"cpuFlags\":[\"avx2\",\"avx512f\",\"avx512vnni\",\"amx_tile\",\"amx_int8\"],"
-        + "\"memoryLimitBytes\":3221225472,\"memorySource\":\"auto\"}"
+        + "\"memoryLimitBytes\":3221225472,\"memorySource\":\"auto\"},"
+        + "\"calibration\":{\"file\":\"/var/lib/app/synauson/calibration.json\",\"recalibrate\":false,"
+        + "\"vad\":{\"model\":\"sentito-1\",\"threads\":1,\"ms\":0.21,\"source\":\"cached\"},"
+        + "\"turnDetection\":null}"
         + "}";
 
     // What natives before the session pool sent.
@@ -93,6 +96,28 @@ class CapabilitiesTest {
         assertNull(c.stt.detail);
         assertEquals(Boolean.TRUE, c.stt.turnFlush);
         assertEquals(Double.valueOf(0.384), c.stt.forecastReserve);
+        assertEquals("cached", c.stt.source);
+
+        assertNotNull(c.calibration);
+        assertEquals("/var/lib/app/synauson/calibration.json", c.calibration.file);
+        assertFalse(c.calibration.recalibrate);
+        assertNotNull(c.calibration.vad);
+        assertEquals("sentito-1", c.calibration.vad.model);
+        assertEquals(1, c.calibration.vad.threads);
+        assertEquals(0.21, c.calibration.vad.ms, 1e-9);
+        assertEquals("cached", c.calibration.vad.source);
+        assertNull(c.calibration.turnDetection, "not timed yet");
+    }
+
+    @Test
+    void nativesOlderThanTheCalibrationCacheReportNoSource() {
+        String older = JSON.replace(",\"source\":\"cached\"}", "}");
+        older = older.substring(0, older.indexOf(",\"calibration\"")) + "}";
+        Capabilities c = Capabilities.fromJson(older);
+        assertNotNull(c.stt);
+        assertNull(c.stt.source);
+        assertNull(c.calibration);
+        assertNotNull(c.resources);
     }
 
     @Test

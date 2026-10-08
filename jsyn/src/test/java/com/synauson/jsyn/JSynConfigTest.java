@@ -101,6 +101,13 @@ class JSynConfigTest {
     }
 
     @Test
+    void recalibrateIsSentUnderTheNameTheNativeSideReads() {
+        assertFalse(JSynConfig.builder().build().recalibrate);
+        String json = JSynConfig.builder().recalibrate(true).build().toJson();
+        assertTrue(json.contains("\"recalibrate\":true"), json);
+    }
+
+    @Test
     void toJsonCarriesLicensingUnderTheNamesTheNativeSideReads() {
         String json = JSynConfig.builder()
             .licenseKey("KEY-1")

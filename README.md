@@ -611,6 +611,7 @@ default. The STT options:
 | `sttCapacity(workers, threads, maxStreams)` | measured at startup | The STT pool's workers, ONNX Runtime threads per worker, and stream cap; `maxStreams` 0 turns STT off. Each `null` keeps the measured value. |
 | `cpuBudget(Double)` | detected | Cores this runtime may use, fractional allowed. Detected as the smallest of the process's cgroup CPU quota, cpuset, affinity mask and CPU count, so a container or CPU-limited service sizes its model pools to its quota; set it to share a host between runtimes without quotas. `capabilities().resources` reports what was used and why |
 | `memoryBudget(Long)` | the cgroup's limit | Bytes of memory this runtime may use; STT sizes its workers within it |
+| `recalibrate(boolean)` | `false` | Time the models again at startup and replace the timings cached in `calibration.json` in the state directory. A restart otherwise reuses them on the same model, CPU, CPU budget and ONNX Runtime version. Set it after changing hardware in place or to take fresh timings on an idle host. `capabilities().calibration` and `stt.source` report where each timing came from. Natives that predate the cache ignore it. |
 | `sttTurnFlush(Boolean)` | off | Close each turn's transcript on a forecast of its last words as soon as turn detection ends the turn, rather than waiting for the transcription to get there. On a Ryzen 7 3700X it closed long turns about 130 ms sooner for about 26% more CPU, and the decoding it sets aside lowers the STT stream cap by about a quarter. `capabilities().stt.turnFlush` and `forecastReserve` report it. Natives that predate it ignore it. |
 
 The engine also reads these environment variables:
@@ -619,13 +620,14 @@ The engine also reads these environment variables:
 |---|---|
 | `SYNAUSON_LICENSE_KEY` | The license key, used when `licenseKey` is null |
 | `SYNAUSON_MODEL_STORE` | The model store, used when `modelStore` is null. Default: `~/.cache/synauson/models` (or `$XDG_CACHE_HOME/synauson/models`), `%LOCALAPPDATA%\synauson\models` on Windows |
-| `SYNAUSON_STATE_DIR` | The state directory holding the cached license, used when `stateDir` is null. Default: `~/.local/state/synauson` (or `$XDG_STATE_HOME/synauson`), `%LOCALAPPDATA%\synauson\state` on Windows |
+| `SYNAUSON_STATE_DIR` | The state directory holding the cached license and the calibration cache (`calibration.json`), used when `stateDir` is null. Default: `~/.local/state/synauson` (or `$XDG_STATE_HOME/synauson`), `%LOCALAPPDATA%\synauson\state` on Windows |
 | `SYNAUSON_LOG_LEVEL` | Engine log filter in `RUST_LOG` syntax, for example `info` or `debug`. Falls back to `RUST_LOG`, then `warn`. |
 | `SYNAUSON_LOG_FORMAT` | `json` writes JSON lines instead of compact text |
 
 Engine logs go to the process's stderr. The logging variables are read once, when the
 natives load, so set them before the JVM starts. In containers, put the model store and
-the state directory on volumes so that models and the license survive restarts.
+the state directory on volumes so that models, the license and the model timings survive
+restarts.
 
 ## Troubleshooting
 

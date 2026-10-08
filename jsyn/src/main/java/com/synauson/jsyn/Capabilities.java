@@ -77,6 +77,14 @@ public final class Capabilities {
      */
     public final @Nullable Resources resources;
 
+    /**
+     * The calibration cache and the VAD and turn detection timings. STT's own timing is in
+     * {@link #stt}. {@code null} from natives without the cache.
+     *
+     * @since 1.6.0
+     */
+    public final @Nullable Calibration calibration;
+
     private Capabilities() {
         this.license = null;
         this.limitsScope = null;
@@ -88,6 +96,7 @@ public final class Capabilities {
         this.stt = null;
         this.sessions = null;
         this.resources = null;
+        this.calibration = null;
     }
 
     /**
@@ -253,6 +262,56 @@ public final class Capabilities {
     }
 
     /**
+     * The calibration cache: the model timings the runtime sized its pools by, kept in
+     * {@code calibration.json} in the {@linkplain JSynConfig#stateDir state directory}
+     * so a restart reuses them instead of timing again.
+     *
+     * @since 1.6.0
+     */
+    public static final class Calibration {
+        /** The cache file, {@code <stateDir>/calibration.json}; {@code null} without a state directory. */
+        public final @Nullable String file;
+        /** Whether this start ignored the cached timings ({@link JSynConfig.Builder#recalibrate}). */
+        public final boolean recalibrate;
+        /** One sentito-1 chunk (32 ms of audio); {@code null} until timed. */
+        public final @Nullable DetectorTiming vad;
+        /** One turn detection decision; {@code null} until timed. */
+        public final @Nullable DetectorTiming turnDetection;
+
+        private Calibration() {
+            this.file = null;
+            this.recalibrate = false;
+            this.vad = null;
+            this.turnDetection = null;
+        }
+    }
+
+    /**
+     * How long one detector step takes on this machine. The engine times it in the
+     * background at startup once the model is in the store, or reads it from the
+     * calibration cache.
+     *
+     * @since 1.6.0
+     */
+    public static final class DetectorTiming {
+        /** Model id, e.g. {@code fermata-1}. */
+        public final String model;
+        /** ONNX Runtime threads the step ran on. */
+        public final int threads;
+        /** Milliseconds one step takes. */
+        public final double ms;
+        /** {@code "auto"} (timed on this start) or {@code "cached"} (on an earlier one). */
+        public final String source;
+
+        private DetectorTiming() {
+            this.model = null;
+            this.threads = 0;
+            this.ms = 0;
+            this.source = null;
+        }
+    }
+
+    /**
      * A limit and how much of it is in use.
      *
      * @since 1.4.0
@@ -382,6 +441,14 @@ public final class Capabilities {
          * capacity wasn't measured, or from natives without the turn flush.
          */
         public final @Nullable Double forecastReserve;
+        /**
+         * Where the numbers came from: {@code "auto"} (timed on this start),
+         * {@code "cached"} (every timing read from the calibration cache, see
+         * {@link Capabilities#calibration}) or {@code "override"} (all set with
+         * {@link JSynConfig.Builder#sttCapacity}). {@code null} until known, or from
+         * natives without the cache.
+         */
+        public final @Nullable String source;
 
         private SttCapacity() {
             this.state = null;
@@ -395,6 +462,7 @@ public final class Capabilities {
             this.detail = null;
             this.turnFlush = null;
             this.forecastReserve = null;
+            this.source = null;
         }
     }
 }
