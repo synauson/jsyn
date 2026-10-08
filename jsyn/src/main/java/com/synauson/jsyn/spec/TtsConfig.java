@@ -30,9 +30,10 @@ import org.jspecify.annotations.Nullable;
  */
 public final class TtsConfig {
     /**
-     * The speaker's default voice, one of the model's voices such as {@code en-us-f1} or
-     * {@code en-us-m1}. {@code null}: {@code en-us-f1}. An unknown voice fails the add with
-     * an {@link com.synauson.jsyn.exception.InvalidArgumentException}.
+     * The speaker's default voice: one of {@code en-us-f1} to {@code en-us-f11} (female)
+     * or {@code en-us-m1} to {@code en-us-m9} (male), American English. {@code null}:
+     * {@code en-us-f1}. An unknown voice fails the add with an
+     * {@link com.synauson.jsyn.exception.InvalidArgumentException}.
      */
     public final @Nullable String voice;
 
