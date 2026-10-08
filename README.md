@@ -513,8 +513,9 @@ public class AgentStreamReader implements EventStreamObserver<AgentEvent> {
 Give a participant a speaker with `.tts(TtsConfig.defaults())` on its spec, next to the
 `TurnDetectionConfig` and `VadConfig` it needs (a speaker without turn detection throws
 `InvalidArgumentException`): its playback is reported on the participant's agent
-stream. `TtsConfig` sets the default voice (`en-us-f1` unless you pick another of the
-model's voices, such as `en-us-m1`), the default speed (0.25 to 4) and the speaker's id
+stream. `TtsConfig` sets the default voice (`en-us-f1` unless you pick another: the American
+English voices are `en-us-f1` to `en-us-f11` (female) and `en-us-m1` to `en-us-m9`
+(male)), the default speed (0.25 to 4) and the speaker's id
 as a routing source (`<participant id>.speaker`), so you can also route it to a
 recording. The speaker plays to its own participant; a file participant has no output,
 so its speaker plays only where you route it. TTS needs `FEATURE_TTS` in the license.
