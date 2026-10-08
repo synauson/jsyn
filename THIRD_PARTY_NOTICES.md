@@ -7,7 +7,9 @@ license terms apply.
 
 ## Models
 
-Each model's license notice ships inside its download, not in this repository.
+Each model's licence notice ships inside its download, as `<model id>-NOTICE.txt` in the
+model store; `JSyn.modelNotices(store)` returns them. Pass a model's notice on with the
+model.
 
 ## Code and data in the natives jars
 

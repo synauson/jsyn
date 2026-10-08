@@ -654,7 +654,7 @@ without detectors take none.
 (limit, in use, the burst's `ceiling`, a `level` from `ok` to `full`, and the peak since
 start); each capability (`FEATURE_VAD`, `FEATURE_TURN_DETECTION`, `FEATURE_STT`,
 `FEATURE_TTS`, in that order) with `entitled` and `includedBy`; and the state of each
-model (`sentito-1`, `fermata-1`, `spartito-1`, `lettura-1`).
+model (`sentito-1` VAD, `fermata-1` turn detection, `spartito-1` STT, `lettura-1` TTS).
 
 The models the plan includes download into the model store in the background: the VAD
 and turn-detection models for `detect`; for `speech` also the STT model (about 660 MB) and
@@ -791,7 +791,7 @@ restarts.
 | `FailedPreconditionException: ILLEGAL_LICENSE: … is not a valid synauson license: …` from `new JSyn(...)` | The license itself doesn't fit this engine (the message lists every problem, for example a missing session limit or an entitlement set that is no plan). No setting fixes it: send the message to Synauson for a corrected license. |
 | `LimitExceededException: concurrent AI session limit reached: …` | Every AI session the license allows, and its burst, is in use. Remove a participant with detectors, or ask Synauson for more sessions. `capabilities().sessions` shows the limit, use and peak. |
 | `InvalidArgumentException: turn_detection needs vad on the same participant: …` (or `stt needs turn_detection …`) | Each detector needs the one before it on the same participant. Add the `VadConfig` (or `TurnDetectionConfig`) it names. Older natives accepted turn detection without VAD, which then never ran. |
-| `FailedPreconditionException: model 'sentito-1' version 5 is not installed: …` | The model hasn't downloaded yet, or the host is offline. Wait until `capabilities().models` reports it ready, or run `JSyn.importModels`. |
+| `FailedPreconditionException: model 'sentito-1' is not installed: …` | The model hasn't downloaded yet, or the host is offline. Wait until `capabilities().models` reports it ready, or run `JSyn.importModels`. |
 | First `new JSyn(...)` on Windows takes tens of seconds | GStreamer is building its plugin registry. Run `gst-inspect-1.0.exe coreelements` once per user. |
 
 For more detail, rerun with `SYNAUSON_LOG_LEVEL=debug`.
@@ -821,7 +821,7 @@ The integration tests (`*IT`, run with `./gradlew :jsyn:test`) drive the real en
 They need GStreamer, `SYNAUSON_LICENSE_KEY`, Playwright's Chromium
 (`./gradlew :jsyn:installPlaywrightBrowsers`), and model and speech fixtures from the
 engine's private repository, passed with `-DsynausonRepoDir=<dir>`. The runner expects
-`models/sentito-1.onnx` and `models/fermata-1.onnx`, and tests that need
+`models/sentito-1.onnx` and `models/fermata-1.onnx` (each with its `<id>-NOTICE.txt`), and tests that need
 `synauson-server/tests/fixtures/short_speech.wav` skip without it. Outside the Synauson
 team, rely on CI, which runs the full suite on Linux and Windows for every push.
 
