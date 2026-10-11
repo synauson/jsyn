@@ -1,0 +1,75 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  # -------------------------------------------------------------------------
+  # Publish com.synauson:jsyn:<version> to the Synauson Maven repository. The
+  # version comes from the pushed tag (v1.0.0 → 1.0.0) via the JSYN_VERSION env
+  # var read by build.gradle.kts; without the R2_PUBLISH_* secrets the publish fails.
+  # -------------------------------------------------------------------------
+  publish:
+    # Releases publish only from the public repository.
+    if: github.repository == 'synauson/jsyn'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write       # the Sigstore certificate for the attestation
+      attestations: write   # stores it with GitHub
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Temurin 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
+
+      - name: Cache Gradle wrapper + caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-release-${{ hashFiles('**/*.gradle*', 'gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-release-
+
+      - name: Compute version from tag
+        id: version
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Publishing version: $VERSION"
+
+      - name: publish jsyn
+        env:
+          JSYN_VERSION: ${{ steps.version.outputs.version }}
+          R2_PUBLISH_ENDPOINT: ${{ secrets.R2_PUBLISH_ENDPOINT }}
+          R2_PUBLISH_ACCESS_KEY_ID: ${{ secrets.R2_PUBLISH_ACCESS_KEY_ID }}
+          R2_PUBLISH_SECRET_ACCESS_KEY: ${{ secrets.R2_PUBLISH_SECRET_ACCESS_KEY }}
+        run: |
+          ./gradlew :jsyn:publishLibraryPublicationToSynausonRepository --no-daemon --console=plain \
+            "-Dorg.gradle.s3.endpoint=$R2_PUBLISH_ENDPOINT"
+
+      # SLSA build provenance for exactly the files just published (Gradle
+      # uploads these bytes; the .pom is pom-default.xml, the .module is
+      # module.json), signed through Sigstore and kept by GitHub. A customer
+      # checks a download with `gh attestation verify <file> -R synauson/jsyn`.
+      - name: Attest the published files
+        uses: actions/attest@v4
+        with:
+          subject-path: |
+            jsyn/build/libs/jsyn-${{ steps.version.outputs.version }}.jar
+            jsyn/build/libs/jsyn-${{ steps.version.outputs.version }}-sources.jar
+            jsyn/build/libs/jsyn-${{ steps.version.outputs.version }}-javadoc.jar
+            jsyn/build/publications/library/pom-default.xml
+            jsyn/build/publications/library/module.json
