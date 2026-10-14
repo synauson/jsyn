@@ -15,7 +15,7 @@ import com.google.gson.annotations.SerializedName;
  * @since 0.1.0
  */
 public final class VadConfig {
-    /** Probability threshold in {@code [0.0, 1.0]} above which a frame is classified as speech. */
+    /** Probability threshold, above 0 and below 1, above which a frame is classified as speech. */
     public final float threshold;
 
     /** Minimum silence duration in milliseconds required to emit a {@code SpeechEnd} event. */
@@ -29,9 +29,12 @@ public final class VadConfig {
     /**
      * Construct a VAD configuration with the given parameters.
      *
-     * @param threshold    probability threshold in {@code [0.0, 1.0]}
-     * @param minSilenceMs minimum silence duration before {@code SpeechEnd}; non-negative
-     * @param minSpeechMs  minimum speech duration before {@code SpeechStart}; non-negative
+     * <p>Adding a participant with values out of range throws
+     * {@link com.synauson.jsyn.exception.InvalidArgumentException}.
+     *
+     * @param threshold    probability threshold, above 0 and below 1
+     * @param minSilenceMs minimum silence duration before {@code SpeechEnd}, 0 to 10000 ms
+     * @param minSpeechMs  minimum speech duration before {@code SpeechStart}, 0 to 10000 ms
      */
     public VadConfig(float threshold, int minSilenceMs, int minSpeechMs) {
         this.threshold = threshold;

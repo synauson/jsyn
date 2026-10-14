@@ -1,6 +1,6 @@
 # Text to speech
 
-Text to speech (TTS) gives a participant a speaker: text you send is synthesised and
+Text to speech (TTS) gives a participant a speaker: text you send is synthesized and
 played into the call, and what the participant has heard is reported on its
 [agent event stream](voice-agents.md). It speaks American English and, like every AI
 feature, takes one of the license's AI sessions.
@@ -90,7 +90,8 @@ The events come from an [`AgentStreamReader`](voice-agents.md#keeping-up-with-th
 speaker has it, without waiting for synthesis. It returns `true` when this call started
 the utterance.
 
-- An utterance is identified by its `utteranceId` (1 to 256 bytes). A new id starts an
+- An utterance is identified by its `utteranceId`, an id like any other (1 to 128 of
+  `A-Z`, `a-z`, `0-9`, `.`, `_` and `-`). A new id starts an
   utterance, which queues behind any still playing. The same id adds text to it.
   Don't reuse an id: the speaker refuses the ids of its last 256 finished utterances
   with `UTTERANCE_ENDED`.
@@ -140,7 +141,7 @@ Each utterance that plays any audio gets, on the agent stream:
 3. exactly one of `UtteranceDone` (`audioMs`, `atMs`, `underrunMs`),
    `UtteranceInterrupted` or `UtteranceFailed`.
 
-An utterance cancelled or failed before any of its audio played gets only the last
+An utterance canceled or failed before any of its audio played gets only the last
 event.
 
 | Event | Detail |
@@ -200,10 +201,9 @@ participant with a speaker throws `FailedPreconditionException`. The other state
 `loading`, `idle` (not started: no license or model yet, and `detail` says which) and
 `failed` (the next participant with a speaker tries again).
 
-`capabilities().tts.streams` shows the cap on utterances synthesised at once and how
-many are. The cap counts utterances while they play, however many speakers there are.
-Set it, and the
-pool behind it, with `JSynConfig.Builder.ttsCapacity`; `maxStreams` 0 turns TTS off
+`capabilities().tts.streams` shows the cap on utterances synthesized at once and how
+many are in use. The cap counts utterances while they play, however many speakers there
+are. Set it, and the pool behind it, with `JSynConfig.Builder.ttsCapacity`; `maxStreams` 0 turns TTS off
 ([Capacity and sizing](sizing.md#text-to-speech)).
 
 ## Errors
@@ -217,7 +217,10 @@ speaker: ...`:
 | `FailedPreconditionException` | `UTTERANCE_ENDED` | More text for an utterance that ended, finished, was interrupted or failed |
 | `FailedPreconditionException` | `UTTERANCE_NOT_INTERRUPTIBLE` | `cancelUtterance` on an utterance spoken with `interruptible(false)` |
 | `NotFoundException` | `UNKNOWN_UTTERANCE` | An utterance id the speaker never had |
-| `InvalidArgumentException` | `INVALID_SPEAK` | An empty or overlong id, text over its cap, a voice or speed after the first Speak, an unknown voice, a speed out of range, or more than 64 utterances held |
-| `InvalidArgumentException` | | A speaker without turn detection on the participant |
-| `PermissionDeniedException` | | Adding the participant when the license starts nothing new (`license.state` `rejected` or `disconnected`, `license.plan` `none`) |
-| `LimitExceededException` | | Adding a speaker to a runtime with TTS turned off, or a participant with AI when every AI session the license allows is in use |
+| `InvalidArgumentException` | `INVALID_ID` | An empty or overlong utterance id, or one with characters outside `A-Z a-z 0-9 . _ -` |
+| `InvalidArgumentException` | `INVALID_SPEAK` | Text over its cap, a voice or speed after the first Speak, an unknown voice, a speed out of range, or more than 64 utterances held |
+| `InvalidArgumentException` | `INVALID_ARGUMENT` | A speaker without turn detection on the participant |
+| `PermissionDeniedException` | `LICENSE_REJECTED`, `LICENSE_DISCONNECTED`, `LICENSE_EXPIRED` | Adding the participant when the license starts nothing new (`license.state` `rejected`, `disconnected` or, for a developer key, `expired`) |
+| `FailedPreconditionException` | `MODEL_UNAVAILABLE` | Adding a speaker to a runtime with TTS turned off |
+| `LimitExceededException` | `SESSION_LIMIT_REACHED` | A participant with AI when every AI session the license allows is in use |
+| `FailedPreconditionException` | `LICENSE_SHARE_PENDING` | A participant with AI before this runtime holds a share of the license's sessions (its first usage report hasn't got through yet); retry shortly |

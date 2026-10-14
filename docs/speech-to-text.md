@@ -180,9 +180,9 @@ STT participant takes one stream, and one of the license's AI sessions.
 
 | Error | Cause |
 |---|---|
-| `InvalidArgumentException: stt needs turn_detection …` | STT without turn detection on the same participant |
-| `PermissionDeniedException: cannot add a participant to conference '…': …` | The license starts nothing new (`license.state` `rejected` or `disconnected`, `license.plan` `none`) |
-| `FailedPreconditionException` | STT isn't ready yet (above), or the `spartito-1` model isn't downloaded |
+| `InvalidArgumentException: INVALID_ARGUMENT: stt needs turn_detection …` | STT without turn detection on the same participant |
+| `PermissionDeniedException: LICENSE_REJECTED: cannot add a participant to conference '…': …` (or `LICENSE_DISCONNECTED`, `LICENSE_EXPIRED`) | The license starts nothing new (`license.state` `rejected`, `disconnected` or, for a developer key, `expired`) |
+| `FailedPreconditionException` | STT isn't ready yet (above), the `spartito-1` model isn't downloaded, or the runtime holds no share of the license's sessions yet (`LICENSE_SHARE_PENDING`: retry shortly) |
 | `LimitExceededException` | Every STT stream this machine admits is in use, or every AI session the license allows |
 | `NotFoundException` from `streamTranscriptEvents` | No such participant |
 | `FailedPreconditionException` from `streamTranscriptEvents` | The participant has no STT |

@@ -37,7 +37,7 @@ Licensing and storage ([Licensing and models](licensing-and-models.md)):
 |---|---|---|
 | `licenseKey(String)` | `$SYNAUSON_LICENSE_KEY` | The license key. Required one way or the other. |
 | `licenseFile(String)` | none | A license file to use when the licensing server can't be reached |
-| `offline(boolean)` | `false` | Never contact the licensing server |
+| `offline(boolean)` | `false` | Never contact the licensing server. Unless the license is air-gapped, the state directory must hold the usage receipt from an earlier online run ([Run without internet access](licensing-and-models.md#run-without-internet-access)) |
 | `stateDir(String)` | `$SYNAUSON_STATE_DIR`, else the per-user state directory | The cached license file and the model timings (`calibration.json`) |
 | `modelStore(String)` | `$SYNAUSON_MODEL_STORE`, else the per-user cache directory | Where models are downloaded and read from |
 
@@ -45,7 +45,7 @@ Limits ([Conferences and participants](conferences.md#limits-and-monitoring)):
 
 | Option | Default | Effect |
 |---|---|---|
-| `maxConferences(int)` | unlimited | Conferences running at once |
+| `maxConferences(int)` | unlimited | Your own cap on conferences running at once. The license's conference pool applies too, so the smaller wins ([Plans and pools](licensing-and-models.md#plans-and-pools)) |
 | `maxParticipantsPerConference(int)` | unlimited | Participants in one conference, native participants not counted |
 
 Media ([SIP calls](sip.md), [WebRTC calls](webrtc.md)):
@@ -65,10 +65,10 @@ Capacity ([Capacity and sizing](sizing.md)):
 | `cpuBudget(Double)` | detected | Cores this runtime may use, fractions allowed. Detected as the smallest of the process's cgroup CPU quota, cpuset, affinity mask and CPU count. |
 | `memoryBudget(Long)` | the cgroup's memory limit | Bytes of memory this runtime may use; STT sizes its workers within it |
 | `sttCapacity(workers, threads, maxStreams)` | measured at startup | The STT pool: workers, ONNX Runtime threads per worker, and the cap on STT streams. Each `null` keeps the measured value; `maxStreams` 0 turns STT off. |
-| `ttsCapacity(workers, threads, maxStreams)` | from the CPU count | The TTS pool: workers, threads per worker, and the cap on utterances synthesised at once; `maxStreams` 0 turns TTS off |
+| `ttsCapacity(workers, threads, maxStreams)` | from the CPU count | The TTS pool: workers, threads per worker, and the cap on utterances synthesized at once; `maxStreams` 0 turns TTS off |
 | `recalibrate(boolean)` | `false` | Time the models again at startup instead of reusing the cached timings |
 
-Speech to text behaviour ([Speech to text](speech-to-text.md#settings),
+Speech to text behavior ([Speech to text](speech-to-text.md#settings),
 [Voice agents](voice-agents.md#eager-end-of-turn)):
 
 | Option | Default | Effect |

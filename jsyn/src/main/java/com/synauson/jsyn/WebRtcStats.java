@@ -27,12 +27,12 @@ public final class WebRtcStats {
     public final String iceConnectionState;
 
     /**
-     * Current DTLS handshake state as a lowercase string
-     * ({@code "new"}, {@code "connecting"}, {@code "connected"}, {@code "closed"},
-     * {@code "failed"}).
+     * The peer connection state, combining ICE and DTLS, as WebRTC names it
+     * (RTCPeerConnectionState): {@code "new"}, {@code "connecting"}, {@code "connected"},
+     * {@code "disconnected"}, {@code "failed"} or {@code "closed"}.
      */
-    @SerializedName("dtls_state")
-    public final String dtlsState;
+    @SerializedName("connection_state")
+    public final String connectionState;
 
     /** Total RTP packets received from the remote peer. */
     @SerializedName("packets_received")
@@ -54,9 +54,14 @@ public final class WebRtcStats {
     @SerializedName("bytes_sent")
     public final long bytesSent;
 
-    /** Inter-arrival jitter in nanoseconds, exponentially smoothed per RFC 3550. */
-    @SerializedName("jitter_ns")
-    public final long jitterNs;
+    /**
+     * The largest inter-arrival jitter of the peer's streams, in nanoseconds, each
+     * exponentially smoothed per RFC 3550.
+     *
+     * @since 1.7.0
+     */
+    @SerializedName("max_jitter_ns")
+    public final long maxJitterNs;
 
     /** Round-trip time in milliseconds, derived from RTCP sender/receiver reports. */
     @SerializedName("rtt_ms")
@@ -74,13 +79,13 @@ public final class WebRtcStats {
     private WebRtcStats() {
         this.participantId = null;
         this.iceConnectionState = null;
-        this.dtlsState = null;
+        this.connectionState = null;
         this.packetsReceived = 0;
         this.packetsLost = 0;
         this.packetsSent = 0;
         this.bytesReceived = 0;
         this.bytesSent = 0;
-        this.jitterNs = 0;
+        this.maxJitterNs = 0;
         this.rttMs = 0;
         this.effectiveOptions = null;
     }

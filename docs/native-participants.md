@@ -129,8 +129,8 @@ conference.
 `participant.stats()` returns `NativeParticipantStats`: total bytes written and read,
 how often each ring overran (`ingressOverruns`, `egressOverruns`), how often the engine
 found the ingress ring empty (`ingressUnderruns`), and how many bytes each ring holds
-now. Rising `ingressUnderruns` mean you write too slowly; rising `egressOverruns` mean
-you read too slowly.
+now. A rising `ingressUnderruns` count means you write too slowly, and a rising
+`egressOverruns` count means you read too slowly.
 
 Native participants don't count toward `maxParticipantsPerConference`. A native
 participant joining a running conference starts in real time, and `muteParticipant`

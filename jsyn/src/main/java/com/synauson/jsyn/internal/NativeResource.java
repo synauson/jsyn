@@ -11,7 +11,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * <p>Subclasses pass a {@link Runnable} to the constructor that performs the native
  * free operation (e.g. {@code NativeBridge.unsubscribe(id)}). This runnable is
  * registered with a shared {@link Cleaner}: it will run when the object is
- * {@link #close() closed} explicitly, or — as a safety net — when the GC collects
+ * {@link #close() closed} explicitly or, as a safety net, when the GC collects
  * an unclosed instance.
  *
  * <p>Explicit {@link #close()} is idempotent: subsequent calls are no-ops. Subclasses
@@ -47,8 +47,8 @@ public abstract class NativeResource implements AutoCloseable {
     }
 
     /**
-     * Release the native resource. Idempotent — subsequent calls are no-ops.
-     * The {@code Cleaner} safety net is cancelled on the first call.
+     * Release the native resource. Idempotent: subsequent calls are no-ops.
+     * The {@code Cleaner} safety net is canceled on the first call.
      */
     @Override
     public final void close() {
@@ -65,7 +65,7 @@ public abstract class NativeResource implements AutoCloseable {
     protected final void requireOpen() {
         if (closed.get()) {
             throw new NativeResourceClosedException(
-                getClass().getSimpleName() + " is closed");
+                "HANDLE_CLOSED: " + getClass().getSimpleName() + " is closed");
         }
     }
 

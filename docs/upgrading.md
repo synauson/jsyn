@@ -1,7 +1,64 @@
-# Upgrading from jsyn 1.5 to 1.6
+# Upgrading jsyn
+
+- [From 1.6 to 1.7](#from-16-to-17)
+- [From 1.5 to 1.6](#from-15-to-16)
+
+## From 1.6 to 1.7
+
+jsyn 1.7.0 runs on jsyn-natives 1.8.0 or newer; the license key and the models stay as
+they are. Update both dependencies together, then rename what you read:
+
+| 1.6 | 1.7 |
+|---|---|
+| `RuntimeStats.tokioWorkers`, `RuntimeStats.tokioBlockingWorkers` | `RuntimeStats.workerThreads`, `RuntimeStats.blockingThreads` |
+| `WebRtcStats.dtlsState` | `WebRtcStats.connectionState`, the peer connection state, which can also be `disconnected` |
+| `WebRtcStats.jitterNs` | `WebRtcStats.maxJitterNs`, the largest jitter of the peer's streams |
+| `Capabilities.ModelInfo.version` | `Capabilities.ModelInfo.variant`, the same values (`cpu`, `int8`, `fp32`) |
+| `SipStats.rttMs` | Removed: it was always 0 |
+| `Capabilities.conferences`, a deprecated `Usage` and null | `Capabilities.conferences`, a `Capabilities.Pool`: the license's conference pool. Code compiled against 1.6 that reads it must be recompiled |
+| `Capabilities.Sessions` | `Capabilities.Pool`. `Sessions` still works, deprecated, and `caps.sessions` reads as either |
+
+These calls behave differently:
+
+- Every license now includes a pool of concurrent conferences, with AI or without, 10
+  on the Free base. Past the pool and its burst, `startConference` throws `LimitExceededException` with
+  `CONFERENCE_POOL_LIMIT_REACHED`. `maxConferences` is still your own cap
+  (`CONFERENCE_LIMIT_REACHED`); the smaller of the two wins. `capabilities().conferences`
+  shows the pool ([Plans and pools](licensing-and-models.md#plans-and-pools)).
+- Before a runtime's first usage report gets through, it holds no share of the
+  license's pools yet: starting a conference, or adding a participant with AI, throws
+  `FailedPreconditionException` with `LICENSE_SHARE_PENDING`. Retry shortly; the pool
+  isn't full.
+- `capabilities().license.plan` now names the license's plan: `free`, `paid`,
+  `developer` or `unlicensed`. It used to be `all`, or `none` while the license started
+  nothing new. Whether new work starts is `license.state`; code that tested
+  `plan.equals("none")` should test the state instead.
+- An expired developer key starts no new conference or participant:
+  `PermissionDeniedException` with `LICENSE_EXPIRED`.
+- Every exception message starts with a reason code ([Errors](errors.md#reason-codes)):
+  match the code, not the text after it.
+- Ids of conferences, participants, speakers and utterances must be 1 to 128 characters
+  from `A-Z`, `a-z`, `0-9`, `.`, `_` and `-`, and a participant with a `TtsConfig` and no
+  `speakerId` at most 120.
+- Adding a speaker to a runtime with TTS turned off throws `FailedPreconditionException`
+  with `MODEL_UNAVAILABLE`, not `LimitExceededException`.
+- The `STT_LAGGING` error event's metadata keys are `backlogMs` and `thresholdMs`.
+- `VadConfig`'s threshold must be above 0 and below 1, and `minSilenceMs` and
+  `minSpeechMs` 0 to 10000; anything else makes the add throw
+  `InvalidArgumentException`.
+- `addPriorityAudioFiles` takes at most 64 files and `updatePartyAudioConnections` at
+  most 4096 entries.
+- `offline(true)` with a license that isn't air-gapped needs the usage receipt from an
+  earlier online run in the state directory, or `new JSyn` throws
+  `PermissionDeniedException` with `NO_LICENSE`. It used to start and refuse every AI
+  participant ([Run without internet access](licensing-and-models.md#run-without-internet-access)).
+
+The rest is in the [changelog](../CHANGELOG.md).
+
+## From 1.5 to 1.6
 
 jsyn 1.6.0 runs on jsyn-natives 1.7.1 or newer. The upgrade changes the license key,
-renames the turn-detection API, and downloads the models again. Plan it as one deploy:
+renames the turn-detection API, and downloads the models again. Plan it as one deployment:
 the new key works only with the new natives, and the old natives don't accept it.
 
 - [Before you start](#before-you-start)
@@ -14,10 +71,10 @@ the new key works only with the new natives, and the old natives don't accept it
 - [7. Set a STUN server if peers are behind NAT](#7-set-a-stun-server-if-peers-are-behind-nat)
 - [Check that it worked](#check-that-it-worked)
 - [If something goes wrong](#if-something-goes-wrong)
-- [Other behaviour changes](#other-behaviour-changes)
+- [Other behavior changes](#other-behavior-changes)
 - [What's new](#whats-new)
 
-## Before you start
+### Before you start
 
 - Get your new license key from Synauson. Keys issued for jsyn 1.5 and earlier don't
   work with natives 1.7 and newer, and older natives can't check the new keys.
@@ -33,7 +90,7 @@ the new key works only with the new natives, and the old natives don't accept it
 - If you run hosts offline, with `offline(true)` and a `licenseFile`, ask Synauson for
   an air-gapped license file and the model files before you upgrade.
 
-## 1. Update the dependencies
+### 1. Update the dependencies
 
 Use jsyn 1.6.0 with jsyn-natives 1.7.1. The coordinates and the repository URL are
 unchanged, but `https://maven.synauson.com/releases` now serves only jsyn 1.6.0 and
@@ -52,9 +109,9 @@ dependencies {
 
 [Install](../README.md#install) has the full Gradle and Maven setup. Upgrade jsyn and
 the natives together: jsyn 1.5.0 can't use turn detection with natives 1.7, and the
-natives now refuse settings they don't recognise.
+natives now refuse settings they don't recognize.
 
-## 2. Replace the license key
+### 2. Replace the license key
 
 jsyn reads the key as before: from `JSynConfig.Builder.licenseKey(...)`, or from
 `SYNAUSON_LICENSE_KEY` when that is null. Replace the old value wherever you set it.
@@ -62,7 +119,7 @@ jsyn reads the key as before: from `JSynConfig.Builder.licenseKey(...)`, or from
 You don't need to clear the state directory. The engine sees that the license cached
 there belongs to the old key and caches the new license over it.
 
-## 3. Rename the turn-detection API
+### 3. Rename the turn-detection API
 
 Turn detection is now named after its role throughout the API. In 1.5 these names
 carried the name of the turn-detection model the engine used then; the table writes
@@ -79,9 +136,9 @@ rows matter only if you build participant JSON yourself.
 | JSON key `xxTurn` (SIP specs) | `turnDetection` |
 
 `VadConfig`, `VadEvent`, `streamVadEvents` and the rest of the 1.5 API keep their names
-and behaviour.
+and behavior.
 
-## 4. Put VAD next to turn detection
+### 4. Put VAD next to turn detection
 
 A participant with `TurnDetectionConfig` now needs a `VadConfig` on the same spec, since
 turn detection decides on the pauses VAD finds. In 1.5 such a participant was accepted
@@ -91,13 +148,13 @@ but never produced a turn event. Now adding it throws:
 InvalidArgumentException: turn_detection needs vad on the same participant: ...
 ```
 
-## 5. Check what you read from capabilities()
+### 5. Check what you read from capabilities()
 
 Skip this step if your code doesn't call `jsyn.capabilities()`.
 
 A license now has a plan and one pool of AI sessions, where 1.5 licenses counted
 conferences and streams. Each participant with AI takes one session
-([Plans and AI sessions](licensing-and-models.md#plans-and-ai-sessions)). The report
+([Plans and pools](licensing-and-models.md#plans-and-pools)). The report
 changed with it:
 
 | 1.5 | 1.6 |
@@ -114,7 +171,7 @@ Code that reads `caps.conferences.limit` throws `NullPointerException` after the
 upgrade. Code that matches a model id or a `license.state` value needs the new values.
 `JSyn.importModels` also returns the new ids.
 
-## 6. Let the models download again
+### 6. Let the models download again
 
 The model store has a new layout, `<model id>/<variant>/<file>`, so the first start
 downloads the models again, in the background. The store's location doesn't change.
@@ -131,21 +188,21 @@ Until a model has downloaded, adding a participant that needs it throws
 delete every directory in the store other than `sentito-1`, `fermata-1`, `spartito-1`
 and `lettura-2`.
 
-## 7. Set a STUN server if peers are behind NAT
+### 7. Set a STUN server if peers are behind NAT
 
 `JSynConfig.Builder.webrtcStunServer` now defaults to none (`""`). jsyn 1.5 passed
 Google's public STUN server, `stun://stun.l.google.com:19302`. If WebRTC peers reach
 the runtime through NAT, set your STUN server (or that one) explicitly; see
 [WebRTC calls](webrtc.md).
 
-## Check that it worked
+### Check that it worked
 
 Start once with `SYNAUSON_LOG_LEVEL=info`, set before the JVM starts. The engine logs a
 `license established` line with `standing=valid` and your plan, then `downloading model`
 and `model downloaded` for each model. From code, `capabilities()` shows the same
 ([Check what the runtime may use](licensing-and-models.md#check-what-the-runtime-may-use)).
 
-## If something goes wrong
+### If something goes wrong
 
 | What you see | Cause and fix |
 |---|---|
@@ -156,9 +213,9 @@ and `model downloaded` for each model. From code, `capabilities()` shows the sam
 | `FailedPreconditionException: model 'fermata-1' is not installed` | The model is still downloading, or the host can't reach Cloudflare R2. Check `capabilities().models`. |
 | `NullPointerException` reading `capabilities()` | See [step 5](#5-check-what-you-read-from-capabilities). |
 
-## Other behaviour changes
+### Other behavior changes
 
-These need no change unless your code relies on the old behaviour:
+These need no change unless your code relies on the old behavior:
 
 - Mistakes in a request throw their own exception, not `InternalException`: an id
   already in use `AlreadyExistsException`; a WebRTC offer that isn't SDP with one audio
@@ -179,7 +236,7 @@ These need no change unless your code relies on the old behaviour:
 - RFC 4733 events on an Opus SIP call run on the codec's 48 kHz clock: negotiate
   `telephone-event/48000` with Opus (and `/8000` with PCMU or PCMA).
 
-## What's new
+### What's new
 
 Version 1.6 adds streaming speech to text, the voice agent event stream with eager end of
 turn, a text to speech speaker, and options to size the engine for its machine.

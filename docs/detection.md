@@ -131,9 +131,11 @@ before it, and a probability under the threshold leaves the turn open.
 
 | Setting | Meaning | Default |
 |---|---|---|
-| `threshold` | Speech probability, 0 to 1, above which a frame counts as speech | 0.5 |
-| `minSilenceMs` | Silence needed before a `SpeechEnd` | 300 |
-| `minSpeechMs` | Speech needed before a `SpeechStart` | 250 |
+| `threshold` | Speech probability, above 0 and below 1, above which a frame counts as speech | 0.5 |
+| `minSilenceMs` | Silence needed before a `SpeechEnd`, 0 to 10000 ms | 300 |
+| `minSpeechMs` | Speech needed before a `SpeechStart`, 0 to 10000 ms | 250 |
+
+A value out of range makes the add throw `InvalidArgumentException`.
 
 Events, on `streamVadEvents`:
 
@@ -169,8 +171,9 @@ them. Both are described in [Voice agents](voice-agents.md#ending-turns-and-the-
 
 | Error | Cause |
 |---|---|
-| `InvalidArgumentException: turn_detection needs vad on the same participant` | A participant with turn detection and no VAD |
-| `PermissionDeniedException: cannot add a participant to conference '…': …` | The license starts nothing new (`license.state` `rejected` or `disconnected`, `license.plan` `none`) |
+| `InvalidArgumentException: INVALID_ARGUMENT: turn_detection needs vad on the same participant` | A participant with turn detection and no VAD |
+| `PermissionDeniedException: LICENSE_REJECTED: cannot add a participant to conference '…': …` (or `LICENSE_DISCONNECTED`, `LICENSE_EXPIRED`) | The license starts nothing new (`license.state` `rejected`, `disconnected` or, for a developer key, `expired`) |
 | `FailedPreconditionException` naming `sentito-1` or `fermata-1` | The model hasn't downloaded yet |
+| `FailedPreconditionException: LICENSE_SHARE_PENDING: …` | The runtime holds no share of the license's sessions yet (its first usage report hasn't got through); retry shortly |
 | `NotFoundException` from `streamVadEvents` or `streamTurnDetectionEvents` | No such participant |
 | `FailedPreconditionException` from `streamVadEvents` or `streamTurnDetectionEvents` | The participant has no such detector |

@@ -89,7 +89,7 @@ public final class SipParticipantHandle {
             case 'B': return 13;
             case 'C': return 14;
             case 'D': return 15;
-            default:  throw new InvalidArgumentException("invalid DTMF digit: '" + digit + "'");
+            default:  throw new InvalidArgumentException("INVALID_ARGUMENT: invalid DTMF digit: '" + digit + "'");
         }
     }
 

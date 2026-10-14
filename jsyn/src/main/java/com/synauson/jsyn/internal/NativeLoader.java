@@ -63,7 +63,7 @@ public final class NativeLoader {
 
         // Pre-load ORT so its symbols are available when the JNI cdylib is loaded.
         System.load(ortLib.toAbsolutePath().toString());
-        // Load JNI cdylib — JNI_OnLoad runs and caches the JavaVM.
+        // Load JNI cdylib: JNI_OnLoad runs and caches the JavaVM.
         System.load(jniLib.toAbsolutePath().toString());
 
         ortDylibAbsolutePath = ortLib.toAbsolutePath().toString();

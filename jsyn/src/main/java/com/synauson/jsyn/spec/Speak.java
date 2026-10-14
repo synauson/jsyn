@@ -7,9 +7,9 @@ import org.jspecify.annotations.Nullable;
  * One {@link com.synauson.jsyn.participant.Conference#speak} call: text for an utterance
  * of a participant's speaker.
  *
- * <p>A new {@link #utteranceId} (1 to 256 bytes, never reused on the speaker) starts an
+ * <p>A new {@link #utteranceId} (1 to 128 of {@code A-Z a-z 0-9 . _ -}, never reused on the speaker) starts an
  * utterance; the same id adds text to it until it ends. {@link #text} is written text, at
- * most 16 KiB per Speak and 64 KiB per utterance; the speaker normalises it (numbers,
+ * most 16 KiB per Speak and 64 KiB per utterance; the speaker normalizes it (numbers,
  * money, dates and codes are read as a person would) and holds back what could still
  * change, such as a number still being written. {@link #release} says what the text
  * ends. {@link #interruptible}, {@link #preemptible}, {@link #voice} and {@link #speed}

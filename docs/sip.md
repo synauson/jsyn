@@ -2,7 +2,7 @@
 
 jsyn handles the media of a SIP call: an RTP session with the far end, optionally
 encrypted with SRTP, carrying G.711 or Opus audio and DTMF. Your SIP stack (a
-proxy, a B2BUA, or a SIP library in your application) handles the signalling and the
+proxy, a B2BUA, or a SIP library in your application) handles the signaling and the
 SDP. You read the peer's address, port and codec from its SDP, and put the port jsyn
 gives you in yours.
 
@@ -113,7 +113,7 @@ conf.connectSipParticipant(SipConnectionSpec.builder()
 
 Our key encrypts what we send, and the peer's key decrypts what it sends. A key of
 another length throws `InvalidArgumentException`. On an outbound call, give the peer's
-key at connect exactly when you gave our key at reservation.
+key at connect if, and only if, you gave our key at reservation.
 
 ## DTMF
 
@@ -145,7 +145,7 @@ System.out.println(stats.packetsReceived + " packets in, " + stats.packetsLost +
 ## Call quality
 
 `handle.stats()` returns `SipStats`: packets received and lost, average jitter
-(`avgJitterNs`), round-trip time (`rttMs`) and the number of active SSRCs. After the
+(`avgJitterNs`) and the number of active SSRCs. After the
 participant is removed it throws `NotFoundException`.
 
 ## Ports and firewalls

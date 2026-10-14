@@ -24,12 +24,12 @@ public final class Args {
      * @param name  the argument's name, used in the message
      * @param <T>   the argument's type
      * @return {@code value}, never null
-     * @throws InvalidArgumentException with message {@code "<name> must not be null"} if
+     * @throws InvalidArgumentException with message {@code "INVALID_ARGUMENT: <name> must not be null"} if
      *         {@code value} is null
      */
     public static <T> T notNull(@Nullable T value, String name) {
         if (value == null) {
-            throw new InvalidArgumentException(name + " must not be null");
+            throw new InvalidArgumentException("INVALID_ARGUMENT: " + name + " must not be null");
         }
         return value;
     }
@@ -75,13 +75,13 @@ public final class Args {
         /**
          * Throw if any recorded field was missing.
          *
-         * @throws InvalidArgumentException with message {@code "<Type> requires a, b"} naming
+         * @throws InvalidArgumentException with message {@code "INVALID_ARGUMENT: <Type> requires a, b"} naming
          *         every missing field in the order they were recorded
          */
         public void validate() {
             if (!missing.isEmpty()) {
                 throw new InvalidArgumentException(
-                    typeName + " requires " + String.join(", ", missing));
+                    "INVALID_ARGUMENT: " + typeName + " requires " + String.join(", ", missing));
             }
         }
     }

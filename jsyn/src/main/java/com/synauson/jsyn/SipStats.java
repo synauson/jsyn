@@ -29,10 +29,6 @@ public final class SipStats {
     @SerializedName("avg_jitter_ns")
     public final long avgJitterNs;
 
-    /** Round-trip time in milliseconds, derived from RTCP sender/receiver reports. */
-    @SerializedName("rtt_ms")
-    public final long rttMs;
-
     /** Number of distinct SSRCs currently receiving RTP traffic. */
     @SerializedName("active_ssrc_count")
     public final int activeSsrcCount;
@@ -42,7 +38,6 @@ public final class SipStats {
         this.packetsReceived = 0;
         this.packetsLost = 0;
         this.avgJitterNs = 0;
-        this.rttMs = 0;
         this.activeSsrcCount = 0;
     }
 

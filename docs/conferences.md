@@ -248,10 +248,20 @@ first time a model is prepared.
 
 ## Limits and monitoring
 
-- `JSynConfig.Builder.maxConferences(n)` caps concurrent conferences, and
-  `maxParticipantsPerConference(n)` caps participants in each (native participants
-  don't count; a SIP reservation does until it connects or is released). Going over
-  either throws `LimitExceededException`. Both are unlimited by default.
+- The license limits concurrent conferences: every live conference takes one of the
+  license's conferences from `startConference` until it ends, with AI or without. The
+  Free base is 10. Past the license's conferences and their burst, `startConference`
+  throws `LimitExceededException` with `CONFERENCE_POOL_LIMIT_REACHED`. A runtime that
+  has no share of the pool yet (before its first usage report gets through) throws
+  `FailedPreconditionException` with `LICENSE_SHARE_PENDING` instead: retry shortly.
+  `capabilities().conferences` shows the limit, use and peak
+  ([Plans and pools](licensing-and-models.md#plans-and-pools)).
+- `JSynConfig.Builder.maxConferences(n)` is your own cap on concurrent conferences on
+  this runtime, and `maxParticipantsPerConference(n)` caps participants in each (native
+  participants don't count; a SIP reservation does until it connects or is released).
+  Going over either throws `LimitExceededException` (`CONFERENCE_LIMIT_REACHED`,
+  `PARTICIPANT_LIMIT_REACHED`). Both are unlimited by default. Your cap and the
+  license's pool both apply, so the smaller wins.
 - `jsyn.getResourceSnapshot()` returns the process's memory and threads, the cgroup's
   memory limit and use, and each conference with its participant count.
 - Each SIP and WebRTC handle has `stats()`, and each `NativeParticipant` has `stats()`.

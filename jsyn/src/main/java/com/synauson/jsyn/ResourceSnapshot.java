@@ -24,7 +24,7 @@ public final class ResourceSnapshot {
     @SerializedName("process_memory")
     public final ProcessMemory processMemory;
 
-    /** Tokio runtime worker thread counts. */
+    /** The engine's own thread pools. */
     @SerializedName("runtime_stats")
     public final RuntimeStats runtimeStats;
 
@@ -70,20 +70,20 @@ public final class ResourceSnapshot {
     }
 
     /**
-     * Tokio runtime worker thread counts.
+     * The engine's own thread pools.
      *
      * @since 0.1.0
      */
     public static final class RuntimeStats {
-        /** Number of standard Tokio worker threads. */
-        @SerializedName("tokio_workers")
-        public final int tokioWorkers;
+        /** Threads that run the engine's conference tasks. */
+        @SerializedName("worker_threads")
+        public final int workerThreads;
 
-        /** Number of Tokio blocking-pool worker threads. */
-        @SerializedName("tokio_blocking_workers")
-        public final int tokioBlockingWorkers;
+        /** Threads in the pool for blocking work, which grows and shrinks on demand. */
+        @SerializedName("blocking_threads")
+        public final int blockingThreads;
 
-        private RuntimeStats() { this.tokioWorkers = 0; this.tokioBlockingWorkers = 0; }
+        private RuntimeStats() { this.workerThreads = 0; this.blockingThreads = 0; }
     }
 
     /**

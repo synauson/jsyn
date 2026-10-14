@@ -46,11 +46,11 @@ public final class JSyn extends NativeResource {
     private final long runtimeHandle;
 
     /**
-     * Construct and initialise a new jsyn runtime.
+     * Construct and initialize a new jsyn runtime.
      *
-     * <p>Loads and initialises the native libraries (idempotent: subsequent
+     * <p>Loads and initializes the native libraries (idempotent: subsequent
      * calls reuse the already-loaded libraries). Blocks until GStreamer and
-     * ONNX Runtime are initialised.
+     * ONNX Runtime are initialized.
      *
      * @param config the runtime configuration
      * @throws com.synauson.jsyn.exception.InvalidArgumentException if {@code config} is null,
@@ -61,7 +61,7 @@ public final class JSyn extends NativeResource {
      *         doesn't fit this engine ({@code ILLEGAL_LICENSE})
      * @throws UnsatisfiedLinkError if the native libraries are missing from the classpath
      * @throws com.synauson.jsyn.exception.InternalException if the GStreamer sanity check fails
-     *         or the runtime cannot be initialised
+     *         or the runtime cannot be initialized
      */
     public JSyn(JSynConfig config) {
         this(initAndGetHandle(config));
@@ -79,7 +79,7 @@ public final class JSyn extends NativeResource {
         String sanityError = NativeBridge.gstreamerSanityCheck();
         if (sanityError != null) {
             throw new com.synauson.jsyn.exception.InternalException(
-                "GStreamer sanity check failed: " + sanityError);
+                "INTERNAL: GStreamer sanity check failed: " + sanityError);
         }
         return NativeBridge.initRuntime(NativeLoader.ortDylibAbsolutePath(), config.toJson());
     }
@@ -129,8 +129,8 @@ public final class JSyn extends NativeResource {
     }
 
     /**
-     * The licence notice of each model in a model store: what the model derives from
-     * and under which licence. Every model ships its notice in its download, and
+     * The license notice of each model in a model store: what the model derives from
+     * and under which license. Every model ships its notice in its download, and
      * redistributing a model means passing its notice on.
      *
      * <p>Each notice is checked against the size and SHA-256 the natives release pins
@@ -175,7 +175,15 @@ public final class JSyn extends NativeResource {
      * @throws com.synauson.jsyn.exception.AlreadyExistsException if a conference
      *         with this ID already exists
      * @throws com.synauson.jsyn.exception.LimitExceededException if the
-     *         {@code maxConferences} cap is reached
+     *         {@code maxConferences} cap is reached ({@code CONFERENCE_LIMIT_REACHED}), or
+     *         the license's concurrent conferences are in use
+     *         ({@code CONFERENCE_POOL_LIMIT_REACHED})
+     * @throws com.synauson.jsyn.exception.FailedPreconditionException if this runtime
+     *         holds no share of the license's conference pool yet
+     *         ({@code LICENSE_SHARE_PENDING}); retry later
+     * @throws com.synauson.jsyn.exception.PermissionDeniedException if the license
+     *         starts nothing new ({@code LICENSE_REJECTED}, {@code LICENSE_DISCONNECTED},
+     *         {@code LICENSE_EXPIRED})
      * @throws com.synauson.jsyn.exception.NativeResourceClosedException if this
      *         runtime has been closed
      */
@@ -213,7 +221,7 @@ public final class JSyn extends NativeResource {
         Args.notNull(grace, "grace");
         if (grace.isNegative()) {
             throw new com.synauson.jsyn.exception.InvalidArgumentException(
-                "grace must not be negative");
+                "INVALID_ARGUMENT: grace must not be negative");
         }
         NativeBridge.shutdownServer(runtimeHandle, grace.toMillis());
     }
@@ -231,8 +239,8 @@ public final class JSyn extends NativeResource {
     }
 
     /**
-     * What this runtime may use right now: the license and its state, its usage limits
-     * and current usage, the AI capabilities it includes, and each model's state.
+     * What this runtime may use right now: the license and its state, its two pools (AI
+     * sessions and conferences) and their current use, the AI capabilities it includes, and each model's state.
      *
      * @return the capabilities report
      * @throws com.synauson.jsyn.exception.NativeResourceClosedException if already closed

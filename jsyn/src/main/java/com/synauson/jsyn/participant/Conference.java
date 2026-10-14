@@ -367,8 +367,8 @@ public final class Conference extends NativeResource {
      * @param matrix the desired audio connection topology
      * @throws com.synauson.jsyn.exception.NativeResourceClosedException if this conference is closed
      * @throws com.synauson.jsyn.exception.InvalidArgumentException if {@code matrix} is null,
-     *         a source has no audio of its own (a recording), or a destination can't receive
-     *         audio (a file participant)
+     *         a source has no audio of its own (a recording), a destination can't receive
+     *         audio (a file participant), or the matrix has more than 4096 entries
      * @throws com.synauson.jsyn.exception.NotFoundException if the matrix names a participant
      *         that isn't in the conference
      * @throws com.synauson.jsyn.exception.FailedPreconditionException if the matrix routes to
@@ -397,7 +397,8 @@ public final class Conference extends NativeResource {
      * @throws com.synauson.jsyn.exception.NativeResourceClosedException if this conference is closed
      * @throws com.synauson.jsyn.exception.InvalidArgumentException if
      *         {@code participantId}, {@code files}, or any element of {@code files} is null,
-     *         {@code files} is empty, or a URI is invalid as for {@link #addFileParticipant}
+     *         {@code files} is empty or has more than 64 files, or a URI is invalid as for
+     *         {@link #addFileParticipant}
      * @throws com.synauson.jsyn.exception.NotFoundException if there is no such participant,
      *         or a {@code file:} URI's file doesn't exist (every URI is checked before any
      *         plays)

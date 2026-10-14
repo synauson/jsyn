@@ -9,9 +9,9 @@ The javadoc's `@throws` clauses say which exceptions each method throws.
 | `InvalidArgumentException` | An argument or a setting is wrong | A required builder field missing (the message names each one), a null argument, an unknown codec or voice, a value out of range, a detector without the one it needs, no license key, a WebRTC offer that isn't SDP with one audio stream, a file the engine can't play, a route from a recording or to a file participant, `INVALID_TURN_CONFIG`, `INVALID_SPEAK` |
 | `NotFoundException` | No such conference, participant or file | A participant removed or never added (in a call, a route or a stream subscription), a `file:` URI whose file doesn't exist, a conference ended by `shutdownServer` |
 | `AlreadyExistsException` | The id is taken | A conference, participant, SIP reservation or speaker id already in use |
-| `FailedPreconditionException` | The call can't run in the current state | A model not downloaded yet, STT or TTS still loading, a detector stream on a participant without that detector, priority audio on a participant that isn't a file participant, a route to or from a SIP reservation that hasn't connected, `TTS_REQUIRED`, `UTTERANCE_ENDED`, an illegal license file |
-| `PermissionDeniedException` | The license doesn't allow it | A key the licensing server refused, no license file that still works (7 days after the last usage report that got through), or a runtime that hasn't reached the server for 7 days (`disconnected`) |
-| `LimitExceededException` | A limit is reached | Every AI session in use, the machine's STT stream cap, a speaker on a runtime with TTS turned off, `maxConferences` or `maxParticipantsPerConference`, no free SIP port pair |
+| `FailedPreconditionException` | The call can't run in the current state | A model not downloaded yet, STT or TTS still loading, a speaker on a runtime with TTS turned off, a detector stream on a participant without that detector, priority audio on a participant that isn't a file participant, a route to or from a SIP reservation that hasn't connected, `TTS_REQUIRED`, `UTTERANCE_ENDED`, an illegal license file, no share of a license pool yet (`LICENSE_SHARE_PENDING`, retry later) |
+| `PermissionDeniedException` | The license doesn't allow it | A key the licensing server refused (`LICENSE_REJECTED`), no license file that still works, 7 days after the last usage report that got through (`NO_LICENSE`), a runtime that hasn't reached the server for 7 days (`LICENSE_DISCONNECTED`), or an expired developer key (`LICENSE_EXPIRED`) |
+| `LimitExceededException` | A limit is reached | Every AI session the license allows in use (`SESSION_LIMIT_REACHED`), every conference the license allows in use (`CONFERENCE_POOL_LIMIT_REACHED`), your own `maxConferences` (`CONFERENCE_LIMIT_REACHED`) or `maxParticipantsPerConference`, the machine's STT stream cap, no free SIP port pair |
 | `NativeResourceClosedException` | The object was closed | A call on a `JSyn`, `Conference`, `Subscription` or `NativeParticipant` after `close()` |
 | `AgentStreamException` | The agent event stream refused or dropped a subscription | See the reasons below |
 | `InternalException` | The engine itself failed; a mistake in your request gets one of the classes above | GStreamer missing an element, a pipeline failure. Treat it as fatal for the call it came from. |
@@ -19,8 +19,23 @@ The javadoc's `@throws` clauses say which exceptions each method throws.
 
 ## Reason codes
 
-Some errors carry a stable reason code. Match on the code, never on the rest of the
-message.
+Every exception's message starts with a stable reason code, then a colon and a
+description: `NotFoundException: CONFERENCE_NOT_FOUND: conference 'c1' not found`.
+Match on the code, never on the rest of the message, which may be reworded in any
+release: every exception's `reason()` returns it (since jsyn 1.7.0), so
+`catch (FailedPreconditionException e)` can retry `MODEL_LOADING` and
+`LICENSE_SHARE_PENDING` and treat the rest as errors. That holds for the checks jsyn makes itself too: a null argument or a missing
+builder field is `INVALID_ARGUMENT`, a call on a closed object `HANDLE_CLOSED`. The codes
+are the reasons of synauson's gRPC API, each with its meaning in the
+[`ErrorReason` table](https://github.com/synauson/api/blob/main/docs/api.md#errorreason);
+jsyn adds `HANDLE_CLOSED` (a call on a closed runtime, conference, participant or
+subscription), and `ILLEGAL_LICENSE` and `NO_LICENSE`, which only `new JSyn` throws.
+
+Ids of conferences, participants, speakers and utterances are 1 to 128 characters from
+`A-Z`, `a-z`, `0-9`, `.`, `_` and `-`: any other id throws `InvalidArgumentException`
+with `INVALID_ID`. A speaker's default id is its participant's id plus `.speaker`, so
+adding a participant with a `TtsConfig` and no `speakerId` throws `INVALID_ID` when the
+participant id is over 120 characters.
 
 `updateTurnConfig` leads its `InvalidArgumentException` message with
 `INVALID_TURN_CONFIG` when it refuses a value

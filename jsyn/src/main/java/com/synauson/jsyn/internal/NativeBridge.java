@@ -29,7 +29,7 @@ public final class NativeBridge {
     // -------------------------------------------------------------------------
 
     /**
-     * Initialise the synauson runtime and return an opaque handle.
+     * Initialize the synauson runtime and return an opaque handle.
      *
      * @param ortDylibPath absolute path to {@code libonnxruntime.so} (or {@code onnxruntime.dll}),
      *                     as extracted by {@link NativeLoader#ortDylibAbsolutePath()}
@@ -79,7 +79,7 @@ public final class NativeBridge {
     public static native String importModels(String requestJson);
 
     /**
-     * The licence notice of each model in a store, verified against the catalog. Needs
+     * The license notice of each model in a store, verified against the catalog. Needs
      * no runtime handle.
      *
      * @param requestJson {@code {"modelStore": "<store>" | null, "model": "<model-id>" | null}}
@@ -131,7 +131,7 @@ public final class NativeBridge {
     // Participant lifecycle  (synauson-jni/src/exports/participant.rs)
     //
     // NOTE: addFileParticipant, addRecordingParticipant, addSipParticipant,
-    // reserveSipParticipant, connectSipParticipant, and addWebRtcParticipant each take (handle, confId, specJson) — participant_id is
+    // reserveSipParticipant, connectSipParticipant, and addWebRtcParticipant each take (handle, confId, specJson); participant_id is
     // embedded in specJson. They do NOT take a separate pid argument.
     // -------------------------------------------------------------------------
 

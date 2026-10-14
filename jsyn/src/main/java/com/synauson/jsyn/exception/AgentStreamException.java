@@ -56,6 +56,7 @@ public class AgentStreamException extends JSynException {
      *
      * @return the reason
      */
+    @Override
     public String reason() { return reason; }
 
     /**

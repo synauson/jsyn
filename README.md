@@ -6,8 +6,9 @@ to deploy. From Java you start conferences, connect SIP, WebRTC, file and in-pro
 audio participants, route audio between them, and get voice activity, end of turn,
 speech to text and text to speech on any participant.
 
-jsyn 1.6.0 needs jsyn-natives 1.7.1 or newer. Coming from 1.5? Read
-[Upgrading to 1.6](docs/upgrading.md) first: it needs a new license key.
+jsyn 1.7.0 needs jsyn-natives 1.8.0 or newer. Coming from 1.6? Read
+[Upgrading to 1.7](docs/upgrading.md#from-16-to-17) first: some fields were
+renamed, and some calls behave differently.
 
 ## Contents
 
@@ -29,7 +30,7 @@ jsyn 1.6.0 needs jsyn-natives 1.7.1 or newer. Coming from 1.5? Read
 | GStreamer | 1.24 or 1.26, installed on the machine. 1.28 is not supported, because it breaks WebRTC. On Linux that rules distributions in or out: see [supported distributions](docs/install.md#supported-distributions). |
 | Visual C++ runtime | Windows only: the Microsoft Visual C++ Redistributable, x64. |
 | License key | Required. Synauson issues keys, free ones included, under the [End User License Agreement](https://synauson.com/legal/eula/). |
-| Network | HTTPS to `usage.synauson.com`, `license.synauson.com`, `status.synauson.com` and Cloudflare R2 (`*.r2.cloudflarestorage.com`), and a synchronised clock (NTP), unless you [run air-gapped](docs/licensing-and-models.md#run-without-internet-access). See [Network and firewall](docs/install.md#network-and-firewall). |
+| Network | HTTPS to `usage.synauson.com`, `license.synauson.com`, `status.synauson.com` and Cloudflare R2 (`*.r2.cloudflarestorage.com`), and a synchronized clock (NTP), unless you [run air-gapped](docs/licensing-and-models.md#run-without-internet-access). See [Network and firewall](docs/install.md#network-and-firewall). |
 
 ONNX Runtime ships inside the natives jar and inference runs on the CPU, so there is
 nothing to install for inference. [Installing the runtime](docs/install.md) has the steps for Linux and
@@ -55,8 +56,8 @@ repositories {
     maven { url = uri("https://maven.synauson.com/releases") }
 }
 
-val jsynVersion = "1.6.0"
-val jsynNativesVersion = "1.7.1"
+val jsynVersion = "1.7.0"
+val jsynNativesVersion = "1.8.0"
 
 dependencies {
     implementation("com.synauson:jsyn:$jsynVersion")
@@ -69,8 +70,8 @@ Maven:
 
 ```xml
 <properties>
-  <jsyn.version>1.6.0</jsyn.version>
-  <jsyn.natives.version>1.7.1</jsyn.natives.version>
+  <jsyn.version>1.7.0</jsyn.version>
+  <jsyn.natives.version>1.8.0</jsyn.natives.version>
 </properties>
 
 <repositories>
@@ -170,7 +171,7 @@ together, then the guide for what you are building.
 | Guide | What it covers |
 |---|---|
 | [Installing the runtime](docs/install.md) | GStreamer on Linux and Windows, the Visual C++ runtime, firewall rules, NVIDIA GPUs |
-| [Licensing and models](docs/licensing-and-models.md) | License keys, plans and AI sessions, license states, model downloads, the model store, offline hosts |
+| [Licensing and models](docs/licensing-and-models.md) | License keys, plans and their AI session and conference pools, developer keys, license states, model downloads, the model store, offline hosts |
 | [Conferences and participants](docs/conferences.md) | The runtime, conferences, routing audio, file playback, recording, mute and announcements, threads and closing |
 | [SIP calls](docs/sip.md) | Inbound and outbound RTP legs, codecs, SRTP, DTMF |
 | [WebRTC calls](docs/webrtc.md) | Offer and answer, trickle ICE, STUN and TURN, per-call options |
@@ -183,7 +184,7 @@ together, then the guide for what you are building.
 | [Capacity and sizing](docs/sizing.md) | How many calls a machine carries, and how the engine measures it |
 | [Errors](docs/errors.md) | The exception classes and the reason codes |
 | [Troubleshooting](docs/troubleshooting.md) | Messages you may see, their cause and the fix |
-| [Upgrading to 1.6](docs/upgrading.md) | What changed from jsyn 1.5 and what to do about it |
+| [Upgrading](docs/upgrading.md) | What changed in jsyn 1.6 and 1.7, and what to do about it |
 
 The API reference is the javadoc, published with every release as
 `jsyn-<version>-javadoc.jar`. Most IDEs attach it on their own.
@@ -206,7 +207,7 @@ on the released jsyn that you can run and adapt.
 jsyn and the `jsyn-natives-*` jars have separate versions. The natives are the engine,
 and an engine fix can ship as a new natives release with no new jsyn. Each jsyn release
 names the natives version it needs in [CHANGELOG.md](CHANGELOG.md); use that version or
-a newer one. For jsyn 1.6.0 that is 1.7.1. The changelog also lists what each release
+a newer one. For jsyn 1.7.0 that is 1.8.0. The changelog also lists what each release
 changed, and `@since` in the javadoc names the release that added each API.
 
 Every file in `https://maven.synauson.com/releases` has `.sha256` and `.sha512`
@@ -220,7 +221,7 @@ gh attestation verify jsyn-<version>.jar -R synauson/jsyn
 gh release verify v<version> -R synauson/jsyn
 ```
 
-The `jsyn-natives-*` jars are signed with synauson's key, published at
+The `jsyn-natives-*` jars are signed with Synauson's key, published at
 https://synauson.com/cosign.pub. Each jar has a `.sigstore.json` bundle beside it in the
 Maven repository; Gradle and Maven ignore it. The same key signs the server image
 `cr.synauson.com/synauson/synauson-server`. With [cosign](https://docs.sigstore.dev/cosign/system_config/installation/):
@@ -238,7 +239,8 @@ These signatures are not recorded in Sigstore's public transparency log, which i
 
 ## Getting help
 
-Contact Synauson through the contact you received with your license key.
+Email Synauson at support@synauson.com, or use the contact you received with your
+license key.
 [SUPPORT.md](SUPPORT.md) says what to include in a report, and
 [SECURITY.md](SECURITY.md) how to report a security problem.
 [Troubleshooting](docs/troubleshooting.md) covers the common errors.

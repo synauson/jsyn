@@ -70,6 +70,6 @@ public enum NativeAudioFormat {
         for (NativeAudioFormat f : values()) {
             if (f.id == id) return f;
         }
-        throw new InvalidArgumentException("unknown NativeAudioFormat id: " + id);
+        throw new InvalidArgumentException("INVALID_ARGUMENT: unknown NativeAudioFormat id: " + id);
     }
 }

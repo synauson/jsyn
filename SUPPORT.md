@@ -1,6 +1,7 @@
 # Getting help
 
-Contact Synauson through the contact you received with your license key.
+Email Synauson at support@synauson.com, or use the contact you received with your
+license key.
 
 To report a problem, please include:
 

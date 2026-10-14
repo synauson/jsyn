@@ -171,7 +171,7 @@ If nothing prints after the version, every element jsyn needs is there. Then run
 | Outbound HTTPS | `license.synauson.com` | Model downloads, and any start without a cached license file |
 | Outbound HTTPS | `*.r2.cloudflarestorage.com` (Cloudflare R2) | Downloads the models, once per model release: about 11 MB for detection, 660 MB for speech to text and 372 MB for text to speech. `license.synauson.com` redirects each file here |
 | Outbound HTTPS | `status.synauson.com` | Synauson's outage notices. While one is up, a runtime whose reports fail keeps its 7 days paused; a runtime that can't read it gets no pause |
-| Outbound UDP 123 (NTP) | your time source | Keep the clock synchronised: licensing answers count only within 5 minutes of it, and outage notices within 10 |
+| Outbound UDP 123 (NTP) | your time source | Keep the clock synchronized: licensing answers count only within 5 minutes of it, and outage notices within 10 |
 | Outbound HTTPS | `maven.synauson.com` | The jsyn jars, at build time only |
 | Outbound UDP (the STUN server's port) | the STUN server you set | Only with `JSynConfig.Builder.webrtcStunServer`; there is none by default. |
 | Inbound and outbound UDP | The SIP media range | `rtpPortMin` to `rtpPortMax`, by default 10000 to 20000 |
@@ -219,7 +219,7 @@ NVIDIA driver, CUDA or cuDNN for jsyn. A GPU in the machine does no harm.
 | It works in a terminal but not as a service or in the IDE | That process started before `Path` changed, or runs as another user. Restart it. |
 | `UnsatisfiedLinkError` naming a `libgst…` library on Linux | GStreamer is missing. Install the [packages](#install-gstreamer). |
 | `gst-inspect-1.0: command not found` | Install `gstreamer1.0-tools`. |
-| `InternalException: GStreamer sanity check failed: required GStreamer element '…' not found` | A plugin package is missing on Linux, or GStreamer was installed without the Complete feature set on Windows. |
+| `InternalException: INTERNAL: GStreamer sanity check failed: required GStreamer element '…' not found` | A plugin package is missing on Linux, or GStreamer was installed without the Complete feature set on Windows. |
 | Adding a SIP participant throws an `InternalException` naming `dtmfdetect` | The distribution's GStreamer has no spandsp plugin, as on RHEL. Use a [supported distribution](#supported-distributions). |
 | WebRTC participants never connect, while SIP works | The ICE plugin (`gstreamer1.0-nice`) is missing, GStreamer is 1.28, or a firewall blocks the WebRTC port range. |
 | SIP calls connect but carry no audio | Inbound UDP to the SIP media range is blocked for the Java process. |

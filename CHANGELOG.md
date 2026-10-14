@@ -4,6 +4,76 @@ All notable changes to jsyn, newest first. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/2.0.0/). Each release names the
 jsyn-natives version it needs; use that version or a newer one.
 
+## [1.7.0] - 2026-10-14
+
+Needs jsyn-natives 1.8.0 or newer.
+
+### Added
+
+- The license's conference pool in `JSyn.capabilities()`: `conferences` reports it like
+  `sessions` (limit, use, ceiling, level, peak, base and purchased), and
+  `usageService` adds `conferenceShare`, `conferenceShareCeiling` and
+  `conferencePoolInUse`. `Capabilities.Pool` is the type of both pools.
+- Developer keys: the Free plan's pools (4 AI sessions, 10 conferences) for one year,
+  for development and testing only, not for production use. See
+  [Licensing and models](https://github.com/synauson/jsyn/blob/v1.7.0/docs/licensing-and-models.md#plans-and-pools).
+- `JSynException.reason()` returns the stable reason code at the start of the message,
+  so code can tell a retryable `FailedPreconditionException` (`MODEL_LOADING`,
+  `LICENSE_SHARE_PENDING`, constants on that class) from a real error without parsing
+  the message.
+
+### Changed
+
+- The Free plan runs 4 AI sessions at once instead of 2, and paid plans add what they
+  buy to that base.
+- Every license now includes a pool of concurrent conferences, with AI or without: 10
+  on the Free base, and paid plans buy more with the same burst as sessions. Past the pool, `startConference` throws
+  `LimitExceededException` with `CONFERENCE_POOL_LIMIT_REACHED`. `maxConferences` stays
+  your own cap and throws with `CONFERENCE_LIMIT_REACHED`; the smaller of the two wins.
+- Until a runtime holds a share of a license pool (for example, before its first usage
+  report gets through), new work from that pool throws `FailedPreconditionException` with
+  `LICENSE_SHARE_PENDING`: retry later, since the pool isn't full.
+- `license.plan` in `JSyn.capabilities()` now names the license's plan, `free`,
+  `paid`, `developer` or `unlicensed`, instead of `all` or `none`; whether new work
+  starts is `license.state`.
+- `Capabilities.conferences` is a `Capabilities.Pool`, no longer a deprecated
+  `Capabilities.Usage`; code compiled against 1.6 that reads it needs recompiling.
+- An expired developer key starts no new conference or participant: it throws
+  `PermissionDeniedException` with `LICENSE_EXPIRED` until Synauson renews it.
+- Some fields have new names: `ResourceSnapshot.RuntimeStats.tokioWorkers` and
+  `tokioBlockingWorkers` are `workerThreads` and `blockingThreads`, `WebRtcStats.dtlsState`
+  is `connectionState`, `WebRtcStats.jitterNs` is `maxJitterNs`, and
+  `Capabilities.ModelInfo.version` is `variant`, with the same values. `SipStats.rttMs`,
+  which was always 0, is gone. See [Upgrading](https://github.com/synauson/jsyn/blob/v1.7.0/docs/upgrading.md#from-16-to-17).
+- Every exception's message starts with a stable reason code, such as
+  `CONFERENCE_NOT_FOUND: ...` ([Errors](https://github.com/synauson/jsyn/blob/v1.7.0/docs/errors.md#reason-codes)), jsyn's own
+  argument checks included (`INVALID_ARGUMENT`, and `HANDLE_CLOSED` on a closed object).
+  Match the code, not the text after it. A license that starts nothing new still throws
+  `PermissionDeniedException`, now with `LICENSE_REJECTED` or `LICENSE_DISCONNECTED`;
+  a start without a license file that still works leads with `NO_LICENSE`.
+- Ids of conferences, participants, speakers and utterances are 1 to 128 characters
+  from `A-Z`, `a-z`, `0-9`, `.`, `_` and `-`; any other id throws
+  `InvalidArgumentException` (`INVALID_ID`). They used to allow other characters. A
+  participant with a `TtsConfig` and no `speakerId` needs an id of at most 120
+  characters, since its speaker's default id adds `.speaker`.
+- Adding a speaker to a runtime with TTS turned off throws
+  `FailedPreconditionException` with `MODEL_UNAVAILABLE`, not `LimitExceededException`.
+- The `STT_LAGGING` error event's metadata keys are `backlogMs` and `thresholdMs`.
+- A VAD threshold outside (0, 1), or a `minSilenceMs` or `minSpeechMs` outside 0 to
+  10000, throws `InvalidArgumentException`.
+- `addPriorityAudioFiles` takes 1 to 64 files and `updatePartyAudioConnections` at most
+  4096 entries; more throws `InvalidArgumentException`.
+- A file event stream for every file participant (`streamFileEvents` with no
+  participant) names the participant each event is about.
+- `offline(true)` with a license that isn't air-gapped refuses the start
+  (`PermissionDeniedException`, `NO_LICENSE`) unless the state directory holds the usage
+  receipt from an earlier online run. It used to start and refuse every AI participant.
+
+### Deprecated
+
+- `Capabilities.Sessions`: name `Capabilities.Pool` instead. `Capabilities.sessions`
+  keeps the `Sessions` type so that code compiled against 1.6 keeps working.
+
 ## [1.6.0] - 2026-10-11
 
 Needs jsyn-natives 1.7.1 or newer, and a new license key. Upgrading from 1.5 takes a

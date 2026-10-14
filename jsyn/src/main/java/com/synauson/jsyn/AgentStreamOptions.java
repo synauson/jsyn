@@ -46,7 +46,7 @@ public final class AgentStreamOptions {
      */
     public static AgentStreamOptions resumeAfter(long streamId, long seq) {
         if (streamId < 0 || seq < 0) {
-            throw new InvalidArgumentException("streamId and seq must be 0 or more");
+            throw new InvalidArgumentException("INVALID_ARGUMENT: streamId and seq must be 0 or more");
         }
         return new AgentStreamOptions(seq, streamId, 0);
     }
@@ -71,7 +71,7 @@ public final class AgentStreamOptions {
      */
     public AgentStreamOptions withHeartbeatMs(int heartbeatMs) {
         if (heartbeatMs <= 0) {
-            throw new InvalidArgumentException("heartbeatMs must be more than 0");
+            throw new InvalidArgumentException("INVALID_ARGUMENT: heartbeatMs must be more than 0");
         }
         return new AgentStreamOptions(afterSeq, streamId, heartbeatMs);
     }

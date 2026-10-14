@@ -1,12 +1,20 @@
 package com.synauson.jsyn.exception;
 
 /**
- * Thrown when the license does not cover what was requested: an AI capability it doesn't
- * include (the message names the entitlement code, e.g. {@code FEATURE_TURN_DETECTION}),
- * or anything new while the licensing server has rejected the license.
- *
- * <p>Maps to the Rust {@code CoreError::PermissionDenied} variant (gRPC
- * {@code PERMISSION_DENIED}). {@link com.synauson.jsyn.JSyn#capabilities()} shows what the license includes.
+ * Thrown when the license does not cover what was requested. Every license refusal throws
+ * this, though the gRPC server sends some as {@code FAILED_PRECONDITION}. The message
+ * leads with the reason:
+ * <ul>
+ *   <li>{@code LICENSE_REJECTED}: the licensing server rejected the license; nothing new
+ *       starts.</li>
+ *   <li>{@code LICENSE_DISCONNECTED}: no usage report has got through for 7 days; nothing
+ *       new starts until one does.</li>
+ *   <li>{@code LICENSE_EXPIRED}: a developer key expired; no new conference or
+ *       participant starts until Synauson renews it.</li>
+ *   <li>{@code NO_LICENSE}: {@code new JSyn} found no license file that still works.</li>
+ * </ul>
+ * Calls in progress continue through the first three.
+ * {@link com.synauson.jsyn.JSyn#capabilities()} shows the license's standing.
  *
  * @since 1.3.0
  */

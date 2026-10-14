@@ -52,7 +52,7 @@ public final class JSynConfig {
 
     /**
      * Directory for state that must survive restarts: the cached license file, this
-     * runtime's last share of the license's session pool ({@code usage/}, so a restart
+     * runtime's last share of each of the license's pools ({@code usage/}, so a restart
      * during an outage keeps it), and the calibration cache ({@code calibration.json},
      * see {@link Builder#recalibrate}).
      * {@code null} selects {@code $SYNAUSON_STATE_DIR} if set, else the per-user
@@ -66,9 +66,13 @@ public final class JSynConfig {
     /**
      * Never contact Synauson (no usage reports, no renewal): use {@link #licenseFile} or
      * the cached license file, until 7 days after the last usage report that got
-     * through (an air-gapped license until its file expires). Without either,
-     * {@code new JSyn} throws
-     * {@link com.synauson.jsyn.exception.PermissionDeniedException}.
+     * through (an air-gapped license until its file expires). A license that isn't
+     * air-gapped also needs the usage receipt an earlier online run kept in
+     * {@link #stateDir} ({@code usage/receipt.json}), so run once without offline mode
+     * on that state directory first. Without a license file, or without that receipt
+     * (natives 1.8.0 and newer), {@code new JSyn} throws
+     * {@link com.synauson.jsyn.exception.PermissionDeniedException} with
+     * {@code NO_LICENSE}.
      *
      * @since 1.4.0
      */
@@ -82,7 +86,11 @@ public final class JSynConfig {
      */
     public final boolean recalibrate;
 
-    /** Maximum concurrent conferences. {@code null} = unlimited. */
+    /**
+     * The operator's cap on concurrent conferences on this runtime. {@code null} =
+     * unlimited. The license's conference pool applies as well, so the smaller of the two
+     * wins. See {@link Builder#maxConferences}.
+     */
     public final @Nullable Integer maxConferences;
 
     /**
@@ -187,7 +195,7 @@ public final class JSynConfig {
     public final @Nullable Integer ttsThreads;
 
     /**
-     * Utterances this runtime synthesises at once; 0 turns TTS off. {@code null}: 2 per
+     * Utterances this runtime synthesizes at once; 0 turns TTS off. {@code null}: 2 per
      * worker.
      *
      * @since 1.6.0
@@ -354,15 +362,15 @@ public final class JSynConfig {
         }
 
         /**
-         * Override the TTS pool's shape and its cap on utterances synthesised at once.
+         * Override the TTS pool's shape and its cap on utterances synthesized at once.
          * Each {@code null} keeps the default, which comes from the CPU count: a quarter
          * of the logical CPUs for TTS, 2 threads a worker when that is two CPUs or more,
          * 1 to 4 workers, and 2 utterances a worker. The cap counts utterances while they
-         * are synthesised and played, not speakers. Natives without TTS ignore it.
+         * are synthesized and played, not speakers. Natives without TTS ignore it.
          *
          * @param workers    synthesis workers (at least 1), or {@code null}
          * @param threads    ONNX Runtime threads per worker (at least 1), or {@code null}
-         * @param maxStreams utterances synthesised at once (0 turns TTS off), or {@code null}
+         * @param maxStreams utterances synthesized at once (0 turns TTS off), or {@code null}
          * @return this builder
          * @since 1.6.0
          */
@@ -485,7 +493,13 @@ public final class JSynConfig {
         }
 
         /**
-         * Cap the number of concurrent conferences. Default: unlimited.
+         * Cap the number of concurrent conferences on this runtime: the operator's own
+         * cap. Default: unlimited. The license's conference pool
+         * ({@link Capabilities#conferences}) applies as well, so the smaller of the two
+         * wins. A conference past this cap throws {@code LimitExceededException} with
+         * {@code CONFERENCE_LIMIT_REACHED}; past the license's pool, with
+         * {@code CONFERENCE_POOL_LIMIT_REACHED}. This cap is checked first, so a runtime
+         * it holds back never takes the license's burst.
          *
          * @param max maximum concurrent conferences; must be positive
          * @return this builder

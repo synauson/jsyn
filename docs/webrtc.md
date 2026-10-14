@@ -2,10 +2,10 @@
 
 A WebRTC participant connects a browser, or any other WebRTC peer, to a conference. The
 peer sends an SDP offer, jsyn answers, and the two sides trade ICE candidates. You carry
-the offer, the answer and the candidates over your own signalling channel, such as a
+the offer, the answer and the candidates over your own signaling channel, such as a
 WebSocket. Audio is Opus: an offer without Opus audio, or whose audio section has no
 direction (`a=sendrecv` and the like), makes the add throw `InvalidArgumentException`
-(natives 1.7.1). No DTMF is negotiated over WebRTC.
+(since natives 1.7.1). No DTMF is negotiated over WebRTC.
 
 - [Join a browser](#join-a-browser)
 - [STUN, TURN and ports](#stun-turn-and-ports)
@@ -17,7 +17,7 @@ direction (`a=sendrecv` and the like), makes the add throw `InvalidArgumentExcep
 <!-- snippet: webrtc-join -->
 ```java
 /** The browser sent its SDP offer: add it, answer, then trickle ICE both ways. */
-static Subscription join(Conference conf, String browserId, String sdpOffer, Signalling browser) {
+static Subscription join(Conference conf, String browserId, String sdpOffer, Signaling browser) {
     WebRtcParticipantHandle peer = conf.addWebRtcParticipant(WebRtcParticipantSpec.builder()
         .participantId(browserId)
         .sdpOffer(sdpOffer)
@@ -40,7 +40,7 @@ static void onBrowserCandidate(WebRtcParticipantHandle peer, String candidate,
 }
 ```
 
-`Signalling` here stands for your channel to the browser.
+`Signaling` here stands for your channel to the browser.
 
 - `addWebRtcParticipant` returns as soon as the answer is ready. It doesn't wait for
   the connection, which needs the answer to reach the browser first.
@@ -133,8 +133,9 @@ amount. An option out of range makes the add throw `InvalidArgumentException`.
 
 ## Call quality
 
-`peer.stats()` returns `WebRtcStats`: the ICE and DTLS states, packets and bytes in and
-out, packets lost, jitter (`jitterNs`), round-trip time (`rttMs`), and
+`peer.stats()` returns `WebRtcStats`: the ICE and peer connection states
+(`iceConnectionState`, `connectionState`), packets and bytes in and
+out, packets lost, the largest jitter (`maxJitterNs`), round-trip time (`rttMs`), and
 `effectiveOptions`, the options the participant ended up with. After the participant
 is removed it throws `NotFoundException`. Packets and bytes out count the audio the
 engine sent the peer. With nothing routed to the peer, the engine sends Opus silence

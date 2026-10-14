@@ -41,7 +41,7 @@ public final class SpscRing {
      */
     public SpscRing(ByteBuffer buffer) {
         if (!buffer.isDirect()) {
-            throw new InvalidArgumentException("ring ByteBuffer must be direct");
+            throw new InvalidArgumentException("INVALID_ARGUMENT: ring ByteBuffer must be direct");
         }
         this.buffer = buffer.duplicate().order(ByteOrder.nativeOrder());
         long cap = (long) LONG_VIEW.get(this.buffer, RingLayout.CAPACITY_OFFSET);

@@ -6,8 +6,8 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * What this runtime may use right now, and how much of it is in use: the license with
- * its plan and standing, the pool of concurrent AI sessions, which AI capabilities the
- * plan includes, and the state of each model.
+ * its plan and standing, its two pools (concurrent AI sessions and concurrent
+ * conferences), which AI capabilities the plan includes, and the state of each model.
  *
  * <p>Deserialized from the JSON returned by {@code NativeBridge.capabilities}; field
  * names match the Rust {@code CapabilitiesReport} (camelCase).
@@ -27,19 +27,28 @@ public final class Capabilities {
     public final String limitsScope;
 
     /**
-     * Fraction above the session limit still admitted as a burst, reported as overage
-     * (0.25 admits up to 125%).
+     * Fraction above the purchased part of each pool (sessions and conferences alike)
+     * still admitted as a burst, reported as overage (0.25 admits up to 125% of what was
+     * purchased). The Free base never bursts.
      */
     public final double overdraft;
 
     /**
-     * Concurrent conferences under the license. {@code null} from natives with the
-     * session pool: licenses no longer limit conferences.
+     * The license's pool of concurrent conferences: every live conference, with AI or
+     * without, takes one from when it starts until it ends. Both pools apply: each
+     * participant using AI in a conference also takes a {@linkplain #sessions session}.
+     * A conference past the pool and its burst throws {@code LimitExceededException}
+     * with {@code CONFERENCE_POOL_LIMIT_REACHED}; one this runtime has no share of the
+     * pool for yet throws {@code FailedPreconditionException} with
+     * {@code LICENSE_SHARE_PENDING} (retry later). {@code null} from natives 1.7.x, which
+     * didn't limit conferences; natives older than the session pool reported only
+     * {@link Pool#limit} and {@link Pool#inUse} here.
      *
-     * @deprecated read {@link #sessions}.
+     * <p>Before jsyn 1.7.0 this field was a {@link Usage}.
+     *
+     * @since 1.4.0
      */
-    @Deprecated
-    public final @Nullable Usage conferences;
+    public final @Nullable Pool conferences;
 
     /**
      * Concurrent conferences using AI under the license. {@code null} from natives
@@ -65,10 +74,13 @@ public final class Capabilities {
 
     /**
      * The license's pool of concurrent AI sessions: each participant with any detector
-     * takes one. {@code null} from natives older than the session pool.
+     * takes one. {@code null} from natives older than the session pool. Its type is the
+     * deprecated {@link Sessions} only so that code compiled against jsyn 1.6 keeps
+     * working; read it as a {@link Pool}.
      *
      * @since 1.6.0
      */
+    @SuppressWarnings("deprecation")
     public final @Nullable Sessions sessions;
 
     /**
@@ -95,8 +107,9 @@ public final class Capabilities {
     public final @Nullable TtsCapacity tts;
 
     /**
-     * This runtime's standing with the usage service: its share of the license's pool
-     * and the time it has left to reconnect. {@code null} from natives 1.7.0 and older.
+     * This runtime's standing with the usage service: its share of each of the license's
+     * pools and the time it has left to reconnect. {@code null} from natives 1.7.0 and
+     * older.
      *
      * @since 1.6.0
      */
@@ -139,14 +152,14 @@ public final class Capabilities {
          * its expiry); {@code "offline"} (usage reports have not reached
          * {@code usage.synauson.com} for an hour or more; full function until 7 days
          * after the last one that did, paused while Synauson's own outage notice is
-         * up); {@code "expired"} (the Free plan: every AI feature with 2 concurrent AI
-         * sessions and no burst); {@code "disconnected"} (7 days without a report
+         * up); {@code "expired"} (a Free or paid license runs on the Free plan: every
+         * AI feature in the Free pools ({@link Pool#base}), and no burst; an expired
+         * developer key starts nothing new until Synauson renews it, and new work throws {@code PermissionDeniedException} with
+         * {@code LICENSE_EXPIRED}); {@code "disconnected"} (7 days without a report
          * getting through: no new conference or participant starts until one does);
          * {@code "invalid-kept-last-valid"} (a renewal brought a license the engine
          * refused, and the last valid one stays in force); or {@code "rejected"}
-         * (nothing new starts). Natives 1.7.0 and older report
-         * {@code "grace"}, {@code "expired-floor"} and {@code "free-floor"} instead of
-         * the Free plan and the refusals.
+         * (nothing new starts).
          */
         public final String state;
         /** One line describing the license and its state. */
@@ -162,10 +175,20 @@ public final class Capabilities {
         /** RFC 3339; the license's own expiry, if it has one. */
         public final @Nullable String licenseExpiry;
         /**
-         * What new work may use now: {@code "all"} (every AI feature; every license
-         * has them all) or {@code "none"} (while the license starts nothing new).
-         * Natives 1.7.0 and older report {@code "detect"} or {@code "speech"}, or
-         * {@code null}.
+         * The license's plan: {@code "free"} (the Free pools, {@link Pool#base}, no
+         * burst), {@code "paid"} (sessions or conferences bought on top
+         * of the Free base, or unlimited), {@code "developer"} (a developer key: the Free
+         * plan's pools for one year, for development and testing only, not for
+         * production use) or {@code "unlicensed"} (no license in force: it was
+         * rejected). A Free or paid license reads {@code "free"} once it expires; a
+         * developer key stays {@code "developer"} once it expires, and starts nothing
+         * new. Whether new work starts is {@link #state}'s answer, never the plan's. May
+         * gain values.
+         *
+         * <p>Always present from natives 1.8.0; {@code null} only from natives too old
+         * to send it. Before jsyn 1.7.0 this field held what new work may use, and
+         * natives before 1.8.0 still send that here: {@code "all"} or {@code "none"}
+         * (older natives {@code "detect"} or {@code "speech"}). That meaning is gone.
          *
          * @since 1.6.0
          */
@@ -201,51 +224,57 @@ public final class Capabilities {
     }
 
     /**
-     * The pool of concurrent AI sessions on this runtime.
+     * One of the license's pools on this runtime: concurrent AI sessions
+     * ({@link Capabilities#sessions}) or concurrent conferences
+     * ({@link Capabilities#conferences}). A unit is a participant using AI or a live
+     * conference. Running units are never stopped; a new one past the limit and its
+     * burst throws {@code LimitExceededException} ({@code SESSION_LIMIT_REACHED} or
+     * {@code CONFERENCE_POOL_LIMIT_REACHED}).
      *
-     * @since 1.6.0
+     * @since 1.7.0
      */
-    public static final class Sessions {
+    public static class Pool {
         /**
          * The license's limit: the Free {@link #base} plus the {@link #purchased}
-         * sessions; {@code null} is unlimited.
+         * units; {@code null} is unlimited.
          */
         public final @Nullable Integer limit;
-        /** Sessions in use. */
+        /** Units in use on this runtime. */
         public final int inUse;
         /**
-         * The most admitted at once: the base plus the purchased sessions with their
+         * The most admitted at once: the base plus the purchased units with their
          * {@link Capabilities#overdraft} burst (none on the base); {@code null} when
          * unlimited.
          */
         public final @Nullable Integer ceiling;
         /**
          * {@code "ok"}; {@code "near-limit"} (from 80% of the limit); {@code "overage"}
-         * (above it, within the burst); or {@code "full"} (a new participant with a
-         * detector throws {@code LimitExceededException}).
+         * (above it, within the burst); or {@code "full"} (a new unit throws
+         * {@code LimitExceededException}). {@code null} only in the conference counts
+         * of natives older than the session pool.
          */
         public final String level;
-        /** The most sessions at once since this runtime started. */
+        /** The most units at once since this runtime started. */
         public final int peak;
         /** RFC 3339; when {@link #peak} was first reached. */
         public final @Nullable String peakAt;
         /**
-         * The Free base every license has: 2 sessions with every AI feature and no
-         * burst; 0 while the license starts nothing new. 0 from natives 1.7.0 and
-         * older.
+         * The Free base every license has in this pool, with no burst: the Free plan's
+         * AI sessions, with every AI feature, or its conferences; 0 while the license
+         * starts nothing new. 0 from natives 1.7.0 and older.
          *
          * @since 1.6.0
          */
         public final int base;
         /**
-         * Sessions the license buys on top of the base; {@code null} is unlimited (or
+         * Units the license buys on top of the base; {@code null} is unlimited (or
          * natives 1.7.0 and older).
          *
          * @since 1.6.0
          */
         public final @Nullable Integer purchased;
 
-        private Sessions() {
+        private Pool() {
             this.limit = null;
             this.inUse = 0;
             this.ceiling = null;
@@ -255,6 +284,18 @@ public final class Capabilities {
             this.base = 0;
             this.purchased = null;
         }
+    }
+
+    /**
+     * The pool of concurrent AI sessions on this runtime: a {@link Pool}.
+     *
+     * @since 1.6.0
+     * @deprecated name {@link Pool} instead; {@link Capabilities#sessions} keeps this
+     *     type only so that code compiled against jsyn 1.6 keeps working.
+     */
+    @Deprecated
+    public static final class Sessions extends Pool {
+        private Sessions() {}
     }
 
     /**
@@ -430,13 +471,18 @@ public final class Capabilities {
     public static final class ModelInfo {
         /**
          * Model id: {@code sentito-1} (VAD), {@code fermata-1} (turn detection),
-         * {@code spartito-1} (STT) or {@code lettura-2} (TTS). Every model is listed; one the plan lacks is
-         * {@code "not-entitled"}.
+         * {@code spartito-1} (STT) or {@code lettura-2} (TTS). Every model is listed; one the license doesn't
+         * entitle (while it starts nothing new) is {@code "not-entitled"}.
          */
         public final String id;
-        /** The variant the engine uses (e.g. {@code int8}): its directory in the model store. */
-        public final String version;
-        /** Published release version. */
+        /**
+         * The variant this machine runs ({@code cpu}, {@code int8} or {@code fp32}): the build
+         * the engine picked, and its directory in the model store.
+         *
+         * @since 1.7.0
+         */
+        public final String variant;
+        /** The model's version: its published release. */
         public final String release;
         /**
          * {@code "ready"}, {@code "downloading"}, {@code "missing"}, {@code "invalid"} or
@@ -449,7 +495,7 @@ public final class Capabilities {
 
         private ModelInfo() {
             this.id = null;
-            this.version = null;
+            this.variant = null;
             this.release = null;
             this.state = null;
             this.detail = null;
@@ -547,7 +593,7 @@ public final class Capabilities {
     }
 
     /**
-     * TTS's synthesis pool, and how many utterances it synthesises at once. The shape
+     * TTS's synthesis pool, and how many utterances it synthesizes at once. The shape
      * comes from the CPU count, or is set with {@link JSynConfig.Builder#ttsCapacity}. A
      * speaker takes a place only while it speaks: from its utterance's first chunk until
      * the utterance is played or interrupted. Each participant with a speaker also takes
@@ -568,7 +614,7 @@ public final class Capabilities {
         public final @Nullable Integer workers;
         /** ONNX Runtime threads per worker, once known. */
         public final @Nullable Integer threadsPerWorker;
-        /** The cap on utterances synthesising at once (once known), and how many are. */
+        /** The cap on utterances being synthesized at once (once known), and how many are in use. */
         public final Usage streams;
         /** Why it is idle, or failed. */
         public final @Nullable String detail;
@@ -584,8 +630,12 @@ public final class Capabilities {
 
     /**
      * The usage service ({@code usage.synauson.com}) as this runtime sees it. Every
-     * instance of a license, servers and JVMs alike, reports its AI session counts there
-     * every 30 seconds and is leased a share of the license's one pool. While reports
+     * instance of a license, servers and JVMs alike, reports its AI session and
+     * conference counts there every 30 seconds and is leased a share of each of the
+     * license's two pools. A runtime with no usable share of a limited pool yet (none
+     * leased since it started, or the only share it holds was leased under the
+     * license's earlier terms) starts nothing new in it: new work throws {@code FailedPreconditionException} with
+     * {@code LICENSE_SHARE_PENDING} until a lease arrives, so retry later. While reports
      * can't get through, the runtime keeps admitting against the last share it held,
      * with its burst, for 7 days after the last report that did; calls in progress are
      * never stopped.
@@ -633,6 +683,30 @@ public final class Capabilities {
         public final @Nullable String refusedAt;
         /** Why the last report failed. */
         public final @Nullable String problem;
+        /**
+         * This runtime's share of the license's conferences, while leased; {@code null}
+         * when unlimited or not leased (then no conference starts, unless the conference
+         * pool is unlimited: {@code LICENSE_SHARE_PENDING}), and from natives older than
+         * 1.8.0.
+         *
+         * @since 1.7.0
+         */
+        public final @Nullable Integer conferenceShare;
+        /**
+         * The most conferences this runtime may hold: its share plus the burst on its
+         * purchased part (none on the Free base). {@code null} from natives older than
+         * 1.8.0.
+         *
+         * @since 1.7.0
+         */
+        public final @Nullable Integer conferenceShareCeiling;
+        /**
+         * Conferences in use across all the license's instances at the last report.
+         * {@code null} from natives older than 1.8.0.
+         *
+         * @since 1.7.0
+         */
+        public final @Nullable Integer conferencePoolInUse;
 
         private UsageService() {
             this.contact = null;
@@ -645,6 +719,9 @@ public final class Capabilities {
             this.pausedSince = null;
             this.refusedAt = null;
             this.problem = null;
+            this.conferenceShare = null;
+            this.conferenceShareCeiling = null;
+            this.conferencePoolInUse = null;
         }
     }
 }

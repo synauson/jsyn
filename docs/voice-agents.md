@@ -250,7 +250,7 @@ The observer runs on an engine thread, and the engine never waits for it. An obs
 `AgentStreamException` whose reason is `AGENT_SUBSCRIBER_LAGGED` and whose `lastSeq()` is
 the last event it got. Hand events to your own queue so this doesn't happen, and resume
 when it does. Subscribe again from another thread, never from inside the observer. This
-reader resumes after the last event it got when it can; when it has to start afresh
+reader resumes after the last event it got when it can; when it has to start over
 with `defaults()`, the replay repeats events it already queued, which your agent skips
 by `seq`:
 
@@ -334,7 +334,7 @@ on its `reason`:
 | `TURN_DETECTION_FAILED` | Turn detection stopped. From then on only the timeout or `forceEndTurn` end turns. |
 | `TURN_DECISION_MISSING` | A speech end got no turn-detection decision within 2 s. The timeout still ends the turn. |
 | `STT_STOPPED` | STT failed. Turns end with the words they had, and later turns have no words. |
-| `STT_LAGGING` | STT's backlog passed the drain budget (at least 500 ms; `metadata` has `backlog_ms` and `threshold_ms`), so turns may end before their last words, which then open the next turn. It is sent again only after the backlog falls to half. A machine with too little CPU for its STT streams causes it; see [Capacity and sizing](sizing.md). |
+| `STT_LAGGING` | STT's backlog passed the drain budget (at least 500 ms; `metadata` has `backlogMs` and `thresholdMs`), so turns may end before their last words, which then open the next turn. It is sent again only after the backlog falls to half. A machine with too little CPU for its STT streams causes it; see [Capacity and sizing](sizing.md). |
 
 `AgentStreamException` ends a subscription, or refuses one, for a reason you can act on:
 `TURN_DETECTION_REQUIRED`, `AGENT_REPLAY_EXPIRED`, `AGENT_STREAM_MISMATCH` or

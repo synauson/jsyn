@@ -24,9 +24,10 @@ engine downloads. Treat them as a guide, and check what your own machine reports
 - The STT turn flush (`sttTurnFlush`) costs about 26% more CPU when on, and lowers the
   stream cap by about a quarter. `sttEager` also sets decoding aside.
 
-Each participant with AI also takes one of the license's AI sessions
-([Plans and AI sessions](licensing-and-models.md#plans-and-ai-sessions)). The session
-limit and the machine's stream cap are separate: a call needs room in both.
+Each participant with AI also takes one of the license's AI sessions, and each
+conference one of the license's conferences
+([Plans and pools](licensing-and-models.md#plans-and-pools)). The license's pools and
+the machine's stream cap are separate: a call needs room in all of them.
 
 ## How the engine measures the machine
 
@@ -76,7 +77,7 @@ how many workers STT starts.
 
 By default a quarter of the logical CPUs go to TTS: 1 to 4 workers, 2 threads a worker
 when there are at least two CPUs for TTS, and 2 utterances a worker. The cap counts
-utterances while they are synthesised and played, not speakers.
+utterances while they are synthesized and played, not speakers.
 `capabilities().tts` reports the pool and the cap. `UtteranceDone.underrunMs` shows
 whether synthesis kept up: on a machine sized for its load it is 0.
 

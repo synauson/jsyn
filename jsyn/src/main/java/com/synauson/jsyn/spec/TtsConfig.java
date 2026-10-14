@@ -16,15 +16,14 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>A speaker needs turn detection on the same participant: what it plays is reported on
  * the participant's agent stream
- * ({@link com.synauson.jsyn.event.AgentEvent.UtteranceStarted} and the rest). The
- * license must include {@code FEATURE_TTS}, and
+ * ({@link com.synauson.jsyn.event.AgentEvent.UtteranceStarted} and the rest).
  * {@link com.synauson.jsyn.Capabilities#tts} must be {@code ready} when the participant
  * is added, or the add throws
- * {@link com.synauson.jsyn.exception.FailedPreconditionException}. On a runtime with TTS
- * turned off ({@code maxStreams} 0 in
+ * {@link com.synauson.jsyn.exception.FailedPreconditionException} ({@code MODEL_LOADING}
+ * while the pool loads, {@code MODEL_UNAVAILABLE} while the TTS model is not in the
+ * store). On a runtime with TTS turned off ({@code maxStreams} 0 in
  * {@link com.synauson.jsyn.JSynConfig.Builder#ttsCapacity}) the add throws
- * {@link com.synauson.jsyn.exception.LimitExceededException}, or the
- * {@code FailedPreconditionException} while the TTS model is not in the store.
+ * {@code FailedPreconditionException} with {@code MODEL_UNAVAILABLE}.
  *
  * <p>Serializes to the JSON shape expected by the Rust {@code TtsConfigInternal}:
  * snake_case field names ({@code speaker_id}). An unset field is left out, so the

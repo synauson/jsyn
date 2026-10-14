@@ -40,7 +40,7 @@ import org.jspecify.annotations.Nullable;
  * ({@link com.synauson.jsyn.spec.TtsConfig}), every utterance that plays any audio gets
  * one {@link UtteranceStarted}, then its {@link WordsPlayed}, then exactly one of
  * {@link UtteranceDone}, {@link UtteranceInterrupted} or {@link UtteranceFailed}; none of
- * its events follows that. One cancelled or failed before any of its audio played gets
+ * its events follows that. One canceled or failed before any of its audio played gets
  * only its {@code UtteranceInterrupted} or {@code UtteranceFailed}. Utterances play one
  * after another in the order they were started; match events to utterances by
  * {@code utteranceId}. "Played" means the audio passed the
@@ -242,7 +242,7 @@ public abstract class AgentEvent {
         public static final String STT_STOPPED = "STT_STOPPED";
         /**
          * STT's backlog passed the participant's STT drain budget (at least 500 ms;
-         * metadata {@code backlog_ms} and {@code threshold_ms}): turns may end before
+         * metadata {@code backlogMs} and {@code thresholdMs}): turns may end before
          * their last words, which then open the next turn, or a late turn of their own
          * when no speech follows. Sent again only after the
          * backlog falls to half the threshold.
